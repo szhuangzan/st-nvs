@@ -1,0 +1,31 @@
+Copyright (C) 2000 Silicon Graphics, Inc.  All Rights Reserved.
+
+
+To build the library, use the GNU make utility.  Run the make command
+(e.g., `gmake') with no arguments to display all supported targets.
+
+
+LICENSE
+
+The State Threads library is a derivative of the Netscape Portable
+Runtime library (NSPR).  All source code in this directory is distributed
+under the terms of the Netscape Public License (NPL).  For more
+information about the NPL, please see http://www.mozilla.org/NPL/.
+
+All source code in the "examples" directory is distributed under the BSD
+style license.
+
+
+DOCUMENTATION
+
+The library documentation can be found in the "docs" directory.
+For more information about this project, please see
+
+    http://oss.sgi.com/projects/state-threads/
+
+
+PLATFORMS
+
+Please see the "docs/notes.html" file for the list of currently supported
+platforms.
+
