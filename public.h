@@ -41,7 +41,6 @@
 #include <sys/socket.h>
 #include <sys/uio.h>
 #include <time.h>
-#include <poll.h>
 
 #ifndef ETIME
 #define ETIME ETIMEDOUT
@@ -102,7 +101,7 @@ extern void *st_netfd_getspecific(st_netfd_t fd);
 extern int st_netfd_serialize_accept(st_netfd_t fd);
 extern int st_netfd_poll(st_netfd_t fd, int how, st_utime_t timeout);
 
-extern int st_poll(struct pollfd *pds, int npds, st_utime_t timeout);
+extern int st_waitl(struct pollfd *pds, int npds, st_utime_t timeout);
 extern st_netfd_t st_accept(st_netfd_t fd, struct sockaddr *addr, int *addrlen,
                             st_utime_t timeout);
 extern int st_connect(st_netfd_t fd, struct sockaddr *addr, int addrlen,

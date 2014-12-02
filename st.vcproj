@@ -285,10 +285,6 @@
 					>
 				</File>
 				<File
-					RelativePath="neterr.h"
-					>
-				</File>
-				<File
 					RelativePath="public.h"
 					>
 				</File>

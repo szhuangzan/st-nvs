@@ -206,24 +206,15 @@
 typedef int ssize_t;
 typedef int mode_t;
 
-struct pollfd {
-               int fd;
-               short events;
-               short revents;
-               };
 size_t getpagesize(void);
-int _st_poll(struct pollfd *pds, int npds, unsigned long timeout, int os);
+
 int _st_GetError(int err);
 
 #if FD_SETSIZE < 200
 #undef FD_SETSIZE
 #define FD_SETSIZE 1024
 #endif
-#define POLLIN 1
-#define POLLPRI 2
-#define POLLOUT 4
-#define POLLERR 8
-#define POLLNVAL 20
+
 
 #define MD_STACK_GROWS_DOWN
 #define MD_USE_BSD_ANON_MMAP

@@ -16,6 +16,7 @@ class cu_proxy_t:public server_base_t
 		net_port_msg_t* msg;
 	}cu_msg_wrap_t;
 public:
+	static	uint32				 _cu_dev_count;
 	cu_proxy_t();
 	virtual ~cu_proxy_t();
 	void init(pu_proxy_t* pu_proxy);
@@ -46,7 +47,7 @@ private:
 	pu_proxy_t*				     _pu_proxy;
 	uint32						 _video_serial;
 	cu_msg_wrap_t*				 _video_msg_wrap;
-	static	uint32				 _cu_dev_count;
+	
 private:
 	
 };

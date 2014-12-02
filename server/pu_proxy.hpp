@@ -23,7 +23,7 @@ typedef struct msg_queue_t
 
 	void backup(std::vector<net_port_msg_t*>& vec)
 	{
-		for(int i=0;i<_msg_vec.size();i++)
+		for(uint i=0;i<_msg_vec.size();i++)
 		{
 			vec.push_back(_msg_vec[i]);
 		}
@@ -33,7 +33,7 @@ typedef struct msg_queue_t
 
 	void clear()
 	{
-		for(int i=0;i<_msg_vec.size();i++)
+		for(uint i=0;i<_msg_vec.size();i++)
 		{
 			_msg_vec[i]->release();
 		}
@@ -47,7 +47,7 @@ typedef struct msg_queue_t
 
 	~msg_queue_t()
 	{
-		for(int i=0;i<_msg_vec.size();i++)
+		for(uint i=0;i<_msg_vec.size();i++)
 		{
 			_msg_vec[i]->release();
 		}
@@ -61,6 +61,7 @@ typedef struct msg_queue_t
 class pu_proxy_t : public server_base_t
 {
 public:
+	static	uint32					 _pu_dev_count;
 	pu_proxy_t(std::string sn);
 	virtual ~pu_proxy_t();
 	void init();
@@ -89,7 +90,7 @@ private:
 	socket_fd_t						_socket_fd;
 	std::vector<cu_proxy_t*>		 _pu_video_proxy_vec;
 	net_port_msg_t*					 _real_video_cmd;
-	static	uint32					 _pu_dev_count;
+	
 	
 };
 

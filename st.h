@@ -44,9 +44,6 @@
 #include "neterr.h"
 #endif
 
-#ifndef ETIME
-#define ETIME ETIMEDOUT
-#endif
 
 #ifdef __cplusplus
 extern "C" {
@@ -67,7 +64,6 @@ typedef void *st_mutex_t;
 typedef void *st_netfd_t;
 
 APIEXPORT int st_init(void);
-APIEXPORT int st_getfdlimit(void);
 
 APIEXPORT st_thread_t st_thread_self(void);
 APIEXPORT void st_thread_exit(void *retval);
@@ -109,9 +105,10 @@ APIEXPORT void st_netfd_setspecific(st_netfd_t fd, void *value,
 APIEXPORT void *st_netfd_getspecific(st_netfd_t fd);
 APIEXPORT int st_netfd_serialize_accept(st_netfd_t fd);
 APIEXPORT int st_netfd_poll(st_netfd_t fd, int how, st_utime_t timeout);
+APIEXPORT st_netfd_t* st_netfd_listen(struct sockaddr_in addr);
 
 APIEXPORT int st_poll(struct pollfd *pds, int npds, st_utime_t timeout);
-APIEXPORT st_netfd_t st_accept(st_netfd_t fd, struct sockaddr *addr, int *addrlen,
+APIEXPORT st_netfd_t st_accept(st_netfd_t fd, char* buf, int recv_len,
                             st_utime_t timeout);
 APIEXPORT int st_connect(st_netfd_t fd, struct sockaddr *addr, int addrlen,
                       st_utime_t timeout);

@@ -45,9 +45,10 @@ static int vp_count = 1;
 
 std::map<std::string,pu_proxy_t*> ServerHandler::_device_map;
 
-void ServerHandler::create_listeners()
+st_netfd_t ServerHandler::create_listeners()
 {
-	int n = 0, sock;
+	st_netfd_t srvfd = NULL;
+	int n = 0;
 	struct sockaddr_in serv_addr;
 	struct hostent *hp = 0;
 	unsigned short port = 0;
@@ -58,17 +59,6 @@ void ServerHandler::create_listeners()
 		port = SERV_PORT_DEFAULT;
 	_socket_info->port=port;
 
-	/* Create server socket */
-	if ((sock = socket(PF_INET, SOCK_STREAM, 0)) < 0)
-	{
-		assert(0);
-	}
-
-	n = 1;
-	if (setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, (char *)&n, sizeof(n)) < 0)
-	{
-		assert(0);
-	}
 	memset(&serv_addr, 0, sizeof(serv_addr));
 	serv_addr.sin_family = AF_INET;
 	serv_addr.sin_port = htons(port);
@@ -81,33 +71,10 @@ void ServerHandler::create_listeners()
 		}
 		memcpy(&serv_addr.sin_addr, hp->h_addr, hp->h_length);
 	}
-	_socket_info->port = port;
 
-	/* Do bind and listen */
-	if (bind(sock, (struct sockaddr *)&serv_addr, sizeof(serv_addr)) < 0)
-	{
-		assert(0);
-	}
-	if (listen(sock, LISTENQ_SIZE_DEFAULT) < 0)
-	{
-		assert(0);
-	}
+	srvfd = st_netfd_listen(serv_addr);
 
-	/* Create file descriptor object from OS socket */
-	if ((_socket_info->nfd = st_netfd_open_socket(sock)) == NULL)
-	{
-		assert(0);
-	}
-	/*
-	* On some platforms (e.g. IRIX, Linux) accept() serialization is never
-	* needed for any OS version.  In that case st_netfd_serialize_accept()
-	* is just a no-op. Also see the comment above.
-	*/
-	if (st_netfd_serialize_accept(_socket_info->nfd) < 0)
-	{
-		assert(0);
-	}
-
+	return srvfd;
 }
 
 void ServerHandler::set_thread_throttling()
@@ -140,10 +107,11 @@ void ServerHandler::set_thread_throttling()
 	//	min_wait_threads = max_wait_threads;
 }
 
-void ServerHandler::start_threads()
+void ServerHandler::start_threads(st_netfd_t srvfd)
 {
 
-	st_thread_create(handle_connections, (void *)_socket_info, 0, 0);
+	st_thread_create(handle_connections, (void *)srvfd, 0, 0);
+	st_thread_create(static_print, (void *)srvfd, 0, 0);
 	//int n = 0;
 	//for (n = 0; n < max_wait_threads; n++) {
 	//	if (st_thread_create(handle_connections, (void *)_socket_info, 0, 0) != NULL)
@@ -161,41 +129,20 @@ static void parseXML(char* buf)
 	
 }
 
-void* ServerHandler::handle_connections(void *arg)
+
+void* ServerHandler::static_print(void *arg)
 {
-	st_netfd_t srv_nfd = 0;
-	st_netfd_t cli_nfd = 0;
-	struct sockaddr_in from = {};
-	int fromlen = sizeof(from);
-
-	srv_socket* _socket_info = (srv_socket*)arg;
-	srv_nfd = _socket_info->nfd;
-
+	time_t time = 0;
+	char buf[20] = {};
+	struct tm* tm_ = 0;
+	while(1)
 	{
-		cli_nfd = st_accept(srv_nfd, (struct sockaddr *)&from, &fromlen,ST_UTIME_NO_TIMEOUT);
-		if (cli_nfd == NULL) 
-		{
-			
-			printf("%s:%d -> %d\n", __FUNCTION__,__LINE__, st_errno());
-			st_thread_create(handle_connections, (void *)_socket_info, 0, 0);
-			return NULL;
-		
-		}
-		{
-			char ip[20] ;
-			memset(ip,0,20);
-			sprintf(ip,"%d:%d:%d:%d",from.sin_addr.S_un.S_un_b.s_b1, 
-				from.sin_addr.S_un.S_un_b.s_b2, 
-				from.sin_addr.S_un.S_un_b.s_b3, 
-				from.sin_addr.S_un.S_un_b.s_b4); 
+		st_sleep(10);
+		time = st_time();
+		tm_ = localtime(&time);
+		sprintf(buf, "%02d:%02d:%02d", tm_->tm_hour, tm_->tm_min, tm_->tm_sec);
+		printf("CUR Time = %s, CUR PU Count  = %d, CUR CU Count  = %d\n",buf, pu_proxy_t::_pu_dev_count, cu_proxy_t::_cu_dev_count);
 
-		//	printf("connect IP:PORT -> %s:%d\n",ip,from.sin_port);
-
-		}
-	
-		st_thread_create(handle_session,cli_nfd,0,0);
-		st_thread_create(handle_connections, (void *)_socket_info, 0, 0);
-	
 	}
 	return NULL;
 }
@@ -277,7 +224,7 @@ void* ServerHandler::handle_session(void* arg)
 		if(!sn) sn = xml.GetRoot()->FindElement("Sn")->GetValueText();
 		if(!strcmp(type, "\"10\""))
 		{
-			printf("SN: %s Login\n", sn);
+			//printf("SN: %s Login\n", sn);
 			if(_device_map.find(sn) == _device_map.end())
 			{
 				_device_map[sn] = new pu_proxy_t(sn);
@@ -299,11 +246,12 @@ void* ServerHandler::handle_session(void* arg)
 			sprintf(sn_tmp, "\"%s\"",sn);
 			if(_device_map.find(sn_tmp) == _device_map.end())
 			{
-				printf("SN: %s Login\n", sn);
+				//printf("SN: %s Login\n", sn);
 				_device_map[sn_tmp] = new pu_proxy_t(sn_tmp);
 			}
 			else
 			{
+				printf("SN: %s NO.......\n", sn);
 				return NULL;
 			}
 			assert(sn_tmp);
@@ -355,7 +303,7 @@ char* ServerHandler::read_auth_type_wrap(st_netfd_t fd)
 	// ¼øÈ¨£º
 
 	net_port_header_t hdr ={};
-	if (st_read_fully(fd, &hdr, sizeof(net_port_header_t)-4, SEC2USEC(REQUEST_TIMEOUT)) < 0) {
+	if (st_read(fd, &hdr, sizeof(net_port_header_t)-4, SEC2USEC(REQUEST_TIMEOUT)) < 0) {
 		st_netfd_close(fd);
 		return NULL;
 	}
@@ -365,7 +313,7 @@ char* ServerHandler::read_auth_type_wrap(st_netfd_t fd)
 	ptr = (char*)malloc(hdr.bodylen+1);
 	memset(ptr, 0, hdr.bodylen+1);
 	{
-		if (st_read_fully(fd, ptr, hdr.bodylen, SEC2USEC(REQUEST_TIMEOUT)) < 0) {
+		if (st_read(fd, ptr, hdr.bodylen, SEC2USEC(REQUEST_TIMEOUT)) < 0) {
 			st_netfd_close(fd);
 			return NULL;
 		}
@@ -399,6 +347,29 @@ char* ServerHandler::read_auth_type_wrap(st_netfd_t fd)
 
 }
 
+ void* ServerHandler::handle_connections(void *arg)
+ {
+	 st_netfd_t cli_nfd = 0;
+	 struct sockaddr_in from = {};
+	 int fromlen = sizeof(from);
+	 st_netfd_t srvfd = (st_netfd_t*)arg;
+	 char buf[1024] = {};
+	 {
+		 cli_nfd = st_accept(srvfd, buf, ((sizeof(SOCKADDR_IN)+16) * 2), ST_UTIME_NO_TIMEOUT);
+		 if (cli_nfd == NULL) 
+		 {
+
+			 printf("%s:%d -> %d\n", __FUNCTION__,__LINE__, st_errno());
+			 st_thread_create(handle_connections, (void *)srvfd, 0, 0);
+			 return NULL;
+
+		 }
+		 st_thread_create(handle_connections, (void *)srvfd, 0, 0);
+		 st_thread_create(handle_session, cli_nfd, 0, 0);
+	 }
+	 return NULL;
+ }
+
 void ServerHandler::run()
 {
 	int rc = 0;
@@ -407,16 +378,15 @@ void ServerHandler::run()
 	if (st_init() < 0)
 		assert(0);
 
-	printf("fd limit : %d\n", st_getfdlimit());
 	/* Set thread throttling parameters */
 	set_thread_throttling();
 
 	/* Create listening sockets */
-	create_listeners();
+	st_netfd_t fd =create_listeners();
 
 	/* Turn time caching on */
 	st_timecache_set(1);
-	start_threads();
+	start_threads(fd);
 
 	while(rc!=EINTR)
 	{

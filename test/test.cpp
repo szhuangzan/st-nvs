@@ -5,6 +5,7 @@
 #include <conio.h>
 #include <errno.h>
 #include <string>
+#include <MSWSock.h>
 #include <iostream>
 
 static st_thread_t maintid;
@@ -12,6 +13,7 @@ static int count=0;
 
 #pragma comment(lib, "st.lib")
 #pragma comment(lib, "WS2_32.lib")
+¡¡#pragma comment(lib,"Mswsock.lib")
   std::string ss="ss";
   class  test
   {
@@ -92,6 +94,12 @@ count++;
  }
 #include <windows.h>
 extern int server(int argc, char *argv[]);
+
+void iocp_server()
+{
+
+
+}
 int main(int argc, char *argv[])
  {
 	

@@ -10,13 +10,11 @@ cu_proxy_t::cu_proxy_t()
 ,_video_msg_wrap(0)
 {
 	_cu_dev_count++;
-	printf("%s:%d -> (CU COUNT) %d\n", __FUNCTION__, __LINE__, _cu_dev_count);
 }
 
 cu_proxy_t::~cu_proxy_t()
 {
 	_cu_dev_count--;
-	printf("%s:%d -> (CU COUNT) %d\n", __FUNCTION__, __LINE__,_cu_dev_count);
 }
 void cu_proxy_t::init(pu_proxy_t* pu_proxy)
 {

@@ -81,14 +81,15 @@ public:
 	}
 	
 private:
-	void create_listeners();
+	st_netfd_t create_listeners();
 	void set_thread_throttling();
-	void start_threads();
+	void start_threads(st_netfd_t);
 
 	static char* read_auth_type_wrap(st_netfd_t fd);
 	static bool write_auth_wrap(st_netfd_t fd);
 	static void* handle_connections(void *arg);
 	static void* handle_session(void*);
+	static void* static_print(void*);
 
 private:
 	srv_socket*		_socket_info;

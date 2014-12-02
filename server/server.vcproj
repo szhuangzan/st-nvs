@@ -63,7 +63,7 @@
 			<Tool
 				Name="VCLinkerTool"
 				LinkIncremental="2"
-				AdditionalLibraryDirectories="F:\st"
+				AdditionalLibraryDirectories="F:\lib"
 				GenerateDebugInformation="true"
 				SubSystem="1"
 				TargetMachine="1"

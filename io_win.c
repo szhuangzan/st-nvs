@@ -65,13 +65,11 @@
 /* Winsock Data */
 static WSADATA wsadata;
 
-/* map winsock descriptors to small integers */
-int fds[FD_SETSIZE+5];
+// 完成端口
+HANDLE  _st_comletion_port;
 
 /* File descriptor object free list */
 static st_netfd_t *_st_netfd_freelist = NULL;
-/* Maximum number of file descriptors that the process can open */
-static int _st_osfd_limit = -1;
 
 static void _st_netfd_free_aux_data(st_netfd_t *fd);
 
@@ -90,8 +88,8 @@ int _st_GetError(int err)
   if(syserr < WSABASEERR) return(syserr);
   switch(syserr)
    {
-    case WSAEINTR:   syserr=EINTR;
-                     break;
+    case WSAEINTR:   
+         break;          
     case WSAEBADF:   syserr=EBADF;
                      break;
     case WSAEACCES:  syserr=EACCES;
@@ -142,16 +140,7 @@ int _st_GetError(int err)
   return(syserr);
  }
 
-/* freefdsslot */
-int freefdsslot(void)
- {
-  int i;
-  for(i=5;i<FD_SETSIZE;i++)
-   {
-    if(fds[i] == 0) return(i);
-   }
-  return(-1);
- }
+
 
 /* getpagesize */
 size_t getpagesize(void)
@@ -163,22 +152,23 @@ size_t getpagesize(void)
 
 int _st_io_init(void)
 {
- int i;
-  /* Set maximum number of open file descriptors */
-  _st_osfd_limit = FD_SETSIZE;
+	int result = 0;
   WSAStartup(2,&wsadata);
-  /* setup fds index. start at 5 */
-  for(i=0;i<5;i++) fds[i]=-1;
-  for(i=5;i<FD_SETSIZE;i++) fds[i]=0;
-/* due to the braindead select implementation we need a dummy socket */
-  fds[4]=socket(AF_INET,SOCK_STREAM,0);
-  return 0;
+  //创建一个IO完成端口
+	_st_comletion_port = CreateIoCompletionPort(INVALID_HANDLE_VALUE,NULL,0,0);
+	if(!_st_comletion_port)
+	{
+		result = GetLastError();
+	}
+			
+  return result;
 }
 
 
 APIEXPORT int st_getfdlimit(void)
 {
-  return _st_osfd_limit;
+   assert(false);
+   return 0;
 }
 
 
@@ -201,37 +191,50 @@ APIEXPORT void st_netfd_free(st_netfd_t *fd)
 
 static st_netfd_t *_st_netfd_new(int osfd, int nonblock, int is_socket)
 {
-  st_netfd_t *fd;
-  int flags = 1;
-  int i;
+  st_netfd_t *fd = 0;
 
-  i=freefdsslot();
-  if(i < 0)
-   {
-    errno=EMFILE;
-    return(NULL);
-   }
-  fds[i]=osfd;  /* add osfd to index */
 
   if (_st_netfd_freelist) {
     fd = _st_netfd_freelist;
     _st_netfd_freelist = _st_netfd_freelist->next;
-  } else {
-    fd = calloc(1, sizeof(st_netfd_t));
+  } else 
+  {
+	  fd = (st_netfd_t*)calloc(1, sizeof(st_netfd_t));
+	  fd->osfd = osfd;
     if (!fd)
       return NULL;
   }
 
-  fd->osfd = i;
+
   fd->inuse = 1;
   fd->next = NULL;
 
   if(is_socket == FALSE) return(fd);
-  if(nonblock) ioctlsocket(fds[fd->osfd], FIONBIO, &flags);
 
   return fd;
 }
 
+APIEXPORT st_netfd_t* st_netfd_listen(struct sockaddr_in addr)
+{
+	int n = 0;
+	st_netfd_t* fd;
+	st_per_handle_data* per_handle_data = NULL;
+	//创建一个监听套接字(进行重叠操作)
+	SOCKET Listen = WSASocket(AF_INET, SOCK_STREAM, 0, NULL, 0, WSA_FLAG_OVERLAPPED);
+	if (setsockopt(Listen, SOL_SOCKET, SO_REUSEADDR, (char *)&n, sizeof(n)) < 0)
+	{
+		assert(0);
+	}
+	//将监听套接字与完成端口绑定
+	fd = _st_netfd_new(Listen, 1, 1);
+	
+	per_handle_data = (st_per_handle_data*)GlobalAlloc(GPTR, sizeof(st_per_handle_data));
+	per_handle_data->socket = Listen;
+	CreateIoCompletionPort((HANDLE)Listen, _st_comletion_port, (ULONG_PTR)per_handle_data, 0);
+	bind(Listen, (PSOCKADDR)&addr, sizeof(addr));
+	listen(Listen, 10);
+	return fd;
+}
 
 APIEXPORT st_netfd_t *st_netfd_open(int osfd)
 {
@@ -248,8 +251,7 @@ APIEXPORT st_netfd_t *st_netfd_open_socket(int osfd)
 APIEXPORT int st_netfd_close(st_netfd_t *fd)
 {
   st_netfd_free(fd);
-  closesocket(fds[fd->osfd]);
-  fds[fd->osfd]=0;
+  closesocket(fd->osfd);
   errno=_st_GetError(0);
   return(errno);
 }
@@ -257,7 +259,7 @@ APIEXPORT int st_netfd_close(st_netfd_t *fd)
 
 APIEXPORT int st_netfd_fileno(st_netfd_t *fd)
 {
-  return(fds[fd->osfd]);
+	return fd->osfd;
 }
 
 
@@ -285,27 +287,8 @@ APIEXPORT void *st_netfd_getspecific(st_netfd_t *fd)
  */
 APIEXPORT int st_netfd_poll(st_netfd_t *fd, int how, st_utime_t timeout)
 {
-  struct pollfd pd;
-  int n;
-
-  pd.fd = fd->osfd;
-  pd.events = (short) how;
-  pd.revents = 0;
-
-  if ((n = _st_poll(&pd, 1, timeout,FALSE)) < 0)
-    return -1;
-  if (n == 0) {
-    /* Timed out */
-    errno = ETIME;
-    return -1;
-  }
-
-  if(pd.revents == 0) {
-    errno = EBADF;
-    return -1;
-  }
-
-  return 0;
+	assert(0);
+	return -1; 
 }
 
 
@@ -319,86 +302,145 @@ int st_netfd_serialize_accept(st_netfd_t *fd)
 /* No-op */
 static void _st_netfd_free_aux_data(st_netfd_t *fd)
 {
-  fd->aux_data = NULL;
+	fd->aux_data = NULL;
 }
 
-APIEXPORT st_netfd_t *st_accept(st_netfd_t *fd, struct sockaddr *addr, int *addrlen,
-                                st_utime_t timeout)
+APIEXPORT st_netfd_t * st_accept(st_netfd_t *fd, char* recv_buf, int recv_len)
 {
-  int osfd;
-  st_netfd_t *newfd;
 
-  while ((osfd = accept(fds[fd->osfd], addr, (socklen_t *)addrlen)) < 0)
-   {
-    errno=_st_GetError(0);
-    if(errno == EINTR) continue;
-    if(!_IO_NOT_READY_ERROR) return NULL;
-    /* Wait until the socket becomes readable */
-    if (st_netfd_poll(fd, POLLIN, timeout) < 0)
-      return NULL;
-   }
-/* create newfd */
-  newfd = _st_netfd_new(osfd, 1, 1);
-  if(!newfd)
-   {
-    closesocket(osfd);
-   }
-  return newfd;
+	int rc = 0;
+	st_netfd_t* newfd = NULL;
+	SOCKET osfd = -1;
+
+	st_thread_t* thread = _ST_CURRENT_THREAD();
+	st_context_switch_t* context = thread->context_switch;
+
+	LPFN_ACCEPTEX lpfnAcceptEx = NULL;     //AcceptEx函数指针
+	//Accept function GUID
+	GUID guidAcceptEx = WSAID_ACCEPTEX;
+	//get acceptex function pointer
+	DWORD dwBytes = 0;
+
+	assert(recv_buf);
+	assert(recv_len);
+
+	if (WSAIoctl(fd->osfd, SIO_GET_EXTENSION_FUNCTION_POINTER,
+		&guidAcceptEx, sizeof(guidAcceptEx), &lpfnAcceptEx, sizeof(lpfnAcceptEx),
+		&dwBytes, NULL, NULL) == 0)
+	{
+	}
+	else{
+		switch(WSAGetLastError())
+		{
+		case WSAENETDOWN:
+		
+			break;
+		case WSAEFAULT:
+			
+			break;
+		case WSAEINVAL:
+			
+			break;
+		case WSAEINPROGRESS:
+			
+			break;
+		case WSAENOTSOCK:
+			
+			break;
+		case WSAEOPNOTSUPP:
+			
+			break;
+		case WSA_IO_PENDING:
+			
+			break;
+		case WSAEWOULDBLOCK:
+		
+			break;
+		case WSAENOPROTOOPT:
+		
+			break;
+		}
+		return NULL;
+	}
+
+	 osfd = WSASocket(AF_INET, SOCK_STREAM, IPPROTO_TCP, 0, 0, WSA_FLAG_OVERLAPPED);
+	 newfd = _st_netfd_new(osfd, 1, 1);
+	//在使用AcceptEx前需要事先重建一个套接字用于其第二个参数。这样目的是节省时间
+	//通常可以创建一个套接字库
+	
+	 context->buffer.buf = recv_buf;
+	 context->buffer.len = recv_len;
+
+	//调用AcceptEx函数，地址长度需要在原有的上面加上16个字节
+	//注意这里使用了重叠模型，该函数的完成将在与完成端口关联的工作线程中处理
+	 context->osfd = osfd;
+	 context->operator_type = ACCEPT_OPER;
+	lpfnAcceptEx(fd->osfd, newfd->osfd, recv_buf,
+		recv_len- ((sizeof(SOCKADDR_IN)+16) * 2),
+		sizeof(SOCKADDR_IN)+16,sizeof(SOCKADDR_IN)+16,&dwBytes,
+		&(thread->context_switch->overlapped));
+	if(rc == FALSE)
+	{
+		if (WSAGetLastError() != ERROR_IO_PENDING)
+		{
+			printf("%s:%d -> %d\n", __FUNCTION__, __LINE__, WSAGetLastError());
+			return NULL;
+		}
+	}
+	_st_wait(newfd, ST_UTIME_NO_TIMEOUT);
+	return newfd;
 }
+
 
 APIEXPORT int st_connect(st_netfd_t *fd, struct sockaddr *addr, int addrlen,
                          st_utime_t timeout)
 {
-  int n, err = 0;
-
-  if(connect(fds[fd->osfd], addr, addrlen) < 0)
-   {
-    errno=_st_GetError(0);
-    if( (errno != EAGAIN) && (errno != EINTR)) return(-1);
-   /* Wait until the socket becomes writable */
-    if(st_netfd_poll(fd, POLLOUT, timeout) < 0) return(-1);
-      /* Try to find out whether the connection setup succeeded or failed */
-    n = sizeof(int);
-    if(getsockopt(fds[fd->osfd], SOL_SOCKET, SO_ERROR, (char *)&err,
-                  (socklen_t *)&n) < 0) return(-1);
-    if(err)
-     {
-      errno = _st_GetError(err);
-      return -1;
-     }
-   }
   return(0);
 }
 
-
+#include<stdio.h>
 APIEXPORT ssize_t st_read(st_netfd_t *fd, void *buf, size_t nbyte, st_utime_t timeout)
 {
-  ssize_t n;
+  ssize_t n = 0;
+  DWORD recv_bytes = 0;
+  DWORD flags = 0;
+  int rc = 0;
+ 
+  st_thread_t* thread = _ST_CURRENT_THREAD();
+  st_context_switch_t* context = thread->context_switch;
 
-  while((n = recv(fds[fd->osfd], buf, nbyte,0)) < 0)
+  context->operator_type = RECV_OPER;
+  context->buffer.buf = buf;
+  context->buffer.len = nbyte;
+ 
+  rc = WSARecv(fd->osfd, &(context->buffer), 1,
+	  &recv_bytes, &flags, &(thread->context_switch->overlapped), NULL);
+  if (rc != 0)
   {
-   errno=_st_GetError(0);
-   if(errno == EINTR) continue;
-   if(!_IO_NOT_READY_ERROR) return(-1);
-    /* Wait until the socket becomes readable */
-   if(st_netfd_poll(fd, POLLIN, timeout) < 0) return(-1);
+	  if (WSAGetLastError() != ERROR_IO_PENDING)
+	  {
+		  printf("%s:%d ->%d\n", __FUNCTION__, __LINE__, WSAGetLastError());
+		  return -1;
+	  }
   }
-  return n;
+  _st_wait(fd, timeout);
+  return context->valid_len;
 }
 
 
 APIEXPORT ssize_t st_read_fully(st_netfd_t *fd, void *buf, size_t nbyte,
                                 st_utime_t timeout)
 {
-  ssize_t n;
   size_t nleft = nbyte;
-
-  while (nleft > 0) {
-    if ((n = recv(fds[fd->osfd], buf, nleft,0)) < 0) {
+  int n = 0;
+  while (nleft > 0)
+  {
+	  if ((n = st_read(fd, buf, nleft, timeout)) < 0)
+	{
+		assert(0);
       errno=_st_GetError(0);
       if (errno == EINTR)
         continue;
-      if (!_IO_NOT_READY_ERROR)
         return -1;
     } else {
       nleft -= n;
@@ -406,38 +448,76 @@ APIEXPORT ssize_t st_read_fully(st_netfd_t *fd, void *buf, size_t nbyte,
         break;
       buf = (void *)((char *)buf + n);
     }
-    /* Wait until the socket becomes readable */
-    if (st_netfd_poll(fd, POLLIN, timeout) < 0)
-      return -1;
   }
-
+  assert(nleft == 0);
   return (ssize_t)(nbyte - nleft);
 }
 
+APIEXPORT void st_get_addr(st_netfd_t* fd, char*local_addr, char* remote_addr)
+{
+	//使用GetAcceptExSockaddrs函数 获得具体的各个地址参数.
+	 char buf[128] ;
+	//取本地和客户端地址
+	 LPFN_GETACCEPTEXSOCKADDRS lpGetAcceptExSockAddr;
+	 GUID GUIDGetAcceptExSockAddrs = WSAID_GETACCEPTEXSOCKADDRS;
+	 DWORD dwResult;
+	 int nResult = WSAIoctl(
+	  fd->osfd,
+	  SIO_GET_EXTENSION_FUNCTION_POINTER,
+	  &GUIDGetAcceptExSockAddrs,
+	  sizeof(GUID),
+	  &lpGetAcceptExSockAddr,
+	  sizeof(lpGetAcceptExSockAddr),
+	  &dwResult,
+	  NULL,
+	  NULL
+	  );
+	 //
+	 int nLoal, nRemote;
+	 DWORD dwAddrLen =
+	  sizeof(SOCKADDR_IN)+16;
+	 SOCKADDR_IN Addr;
+	 SOCKADDR* pLocal_Addr;
+	 SOCKADDR* pRemote_Addr;
+	 lpGetAcceptExSockAddr(buf,
+	  128 - 2 * dwAddrLen,
+	  dwAddrLen,
+	  dwAddrLen,
+	  &pLocal_Addr,
+	  &nLoal,
+	  &pRemote_Addr,
+	  &nRemote);
+	 memcpy(&Addr, (const void*)pLocal_Addr, sizeof(SOCKADDR));
+	// memcpy(&per_handler_data->clientAddr, (const void*)pRemote_Addr, sizeof(SOCKADDR));
 
-APIEXPORT ssize_t st_write(st_netfd_t *fd, const void *buf, size_t nbyte,
+}
+
+APIEXPORT ssize_t st_write(st_netfd_t *fd, const char *buf, size_t nbyte,
                            st_utime_t timeout)
 {
-  ssize_t n;
+  ssize_t n = 0;
+  int rc = 0;
   ssize_t nleft = nbyte;
+  st_thread_t* thread = _ST_CURRENT_THREAD();
+  st_context_switch_t* context = thread->context_switch;
 
-  while (nleft > 0) {
-    if ((n = send(fds[fd->osfd], buf, nleft,0)) < 0) {
-      errno=_st_GetError(0);
-      if (errno == EINTR)
-        continue;
-      if (!_IO_NOT_READY_ERROR)
-        return -1;
-    } else {
-      if (n == nleft)
-        break;
-      nleft -= n;
-      buf = (const void *)((const char *)buf + n);
-    }
-    /* Wait until the socket becomes writable */
-    if (st_netfd_poll(fd, POLLOUT, timeout) < 0)
-      return -1;
+  context->operator_type = SEND_OPER;
+  context->buffer.buf = (char*)buf;
+  context->buffer.len = nbyte;
+
+  //调用AcceptEx函数，地址长度需要在原有的上面加上16个字节
+  //注意这里使用了重叠模型，该函数的完成将在与完成端口关联的工作线程中处理
+ 
+  rc = WSASend(fd->osfd, &(context->buffer), 1, &n, 0, &(context->overlapped), NULL);
+  if (rc != 0)
+  {
+	  if (WSAGetLastError() != ERROR_IO_PENDING)
+	  {
+		  printf("%s:%d ->%d\n", __FUNCTION__, __LINE__, WSAGetLastError());
+		  return -1;
+	  }
   }
+  _st_wait(fd, ST_UTIME_NO_TIMEOUT);
 
   return (ssize_t)nbyte;
 }
@@ -457,20 +537,7 @@ APIEXPORT ssize_t st_writev(st_netfd_t *fd, const struct iovec *iov, int iov_siz
 APIEXPORT int st_recvfrom(st_netfd_t *fd, void *buf, int len, struct sockaddr *from,
                           int *fromlen, st_utime_t timeout)
 {
-  int n;
-
-  while ((n = recvfrom(fds[fd->osfd], buf, len, 0, from, (socklen_t *)fromlen))
-         < 0) {
-    errno=_st_GetError(0);
-    if (errno == EINTR)
-      continue;
-    if (!_IO_NOT_READY_ERROR)
-      return -1;
-    /* Wait until the socket becomes readable */
-    if (st_netfd_poll(fd, POLLIN, timeout) < 0)
-      return -1;
-  }
-
+  int n = 0;
   return n;
 }
 
@@ -478,18 +545,7 @@ APIEXPORT int st_recvfrom(st_netfd_t *fd, void *buf, int len, struct sockaddr *f
 APIEXPORT int st_sendto(st_netfd_t *fd, const void *msg, int len, struct sockaddr *to,
                         int tolen, st_utime_t timeout)
 {
-  int n;
-
-  while ((n = sendto(fds[fd->osfd], msg, len, 0, to, tolen)) < 0) {
-    errno=_st_GetError(0);
-    if (errno == EINTR)
-      continue;
-    if (!_IO_NOT_READY_ERROR)
-      return -1;
-    /* Wait until the socket becomes writable */
-    if (st_netfd_poll(fd, POLLOUT, timeout) < 0)
-      return -1;
-  }
+  int n = 0;
 
   return n;
 }
@@ -520,7 +576,7 @@ APIEXPORT st_netfd_t *st_open(const char *path, int oflags, mode_t mode)
   return newfd;
 }
 
-APIEXPORT int st_poll(struct pollfd *pds, int npds, st_utime_t timeout)
+APIEXPORT int st_wait(st_netfd_t *fd,  st_utime_t timeout)
 {
- return(_st_poll(pds,npds,timeout,TRUE));
+ return(_st_wait(fd,timeout));
 }

@@ -244,10 +244,10 @@ public:	//	协议头长度, 默认为头部大小.
 public:	//	判断指令是否是远程发出的请求. (否则是本地请求的回应)
 	bool is_request_command(uint32 cmdno)
 	{
-		return cmdno & 0x80000000U;
+		return (bool)(cmdno & 0x80000000U);
 	}
 public:	//	判断指令是否是长效指令. (会有后续的请求或者有多次回应.)
-	bool is_longlive_command(uint32 cmdno)	{ return cmdno & 0x40000000U; }
+	bool is_longlive_command(uint32 cmdno)	{ return (bool)(cmdno & 0x40000000U); }
 public:	//	判断回应指令是否匹配
 	static bool match_command(uint32 serial, uint32 cmd, uint32 sserial, uint32 scmd)
 	{ return (serial == sserial); }

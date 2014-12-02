@@ -43,14 +43,18 @@
 
 #include <stddef.h>
 #include <sys/types.h>
+
+#include<errno.h>
+#include <WinSock2.h>
+
+#include <MSWSock.h>
 #ifndef WIN32
 #include <unistd.h>
 #include <sys/time.h>
 #include <poll.h>
 #define APIEXPORT
 #else
-#define FD_SETSIZE 1024
-#include <winsock.h>
+
 #define APIEXPORT
 #endif
 #include <setjmp.h>
@@ -66,6 +70,10 @@
 #define ST_END_MACRO    }
 
 #include "md.h"
+
+#define ACCEPT_OPER 0
+#define SEND_OPER	1
+#define RECV_OPER   2
 
 
 /*****************************************
@@ -155,9 +163,12 @@ typedef struct _st_cond {
 } st_cond_t;
 
 
+struct _st_context_switch_t;
+
 typedef struct _st_thread {
-  int state;                  /* Thread's state */
-  int flags;                  /* Thread's flags */
+
+  int		 state;                  /* Thread's state */
+  int		flags;                  /* Thread's flags */
 
   void *(*start)(void *arg);  /* The start function of the thread */
   void *arg;                  /* Argument of the start function */
@@ -172,9 +183,19 @@ typedef struct _st_thread {
   void **private_data;        /* Per thread private data */
 
   st_cond_t *term;            /* Termination condition variable for join */
-
+  struct _st_context_switch_t* context_switch;
   jmp_buf context;            /* Thread's context */
 } st_thread_t;
+
+
+typedef struct _st_context_switch_t{
+	OVERLAPPED		 overlapped;
+	int				 operator_type;
+	int				 valid_len;
+	SOCKET			 osfd;
+	WSABUF			 buffer;
+	st_thread_t*      thread;
+}st_context_switch_t;
 
 
 typedef struct _st_mutex {
@@ -182,14 +203,6 @@ typedef struct _st_mutex {
   st_clist_t  wait_q;         /* Mutex wait queue */
 } st_mutex_t;
 
-
-typedef struct _st_pollq {
-  st_clist_t links;           /* For putting on io queue */
-  st_thread_t   *thread;      /* Polling thread */
-  struct pollfd *pds;         /* Array of poll descriptors */
-  int npds;                   /* Length of the array */
-  int on_ioq;                 /* Is it on ioq? */
-} st_pollq_t;
 
 
 typedef struct _st_vp {
@@ -209,13 +222,22 @@ typedef struct _st_vp {
 } st_vp_t;
 
 
+
+typedef struct _st_per_handle_data
+{
+	SOCKET socket;					 //相关的套接字
+	SOCKADDR_STORAGE clientAddr;     //客户端的地址
+
+}st_per_handle_data;
+
 typedef struct _st_netfd {
-  int osfd;                   /* Underlying OS file descriptor */
-  int inuse;                  /* In-use flag */
-  void *private_data;         /* Per descriptor private data */
-  st_destructor_t destructor; /* Private data destructor function */
-  void *aux_data;             /* Auxiliary data for internal use */
-  struct _st_netfd *next;     /* For putting on the free list */
+	
+	SOCKET     osfd;
+    int			inuse;                  /* In-use flag */
+    void	    *private_data;         /* Per descriptor private data */
+    st_destructor_t destructor; /* Private data destructor function */
+    void			*aux_data;             /* Auxiliary data for internal use */
+    struct _st_netfd *next;     /* For putting on the free list */
 } st_netfd_t;
 
 
@@ -302,7 +324,7 @@ extern st_thread_t  *_st_this_thread;
     ((st_stack_t *)((char*)(_qp) - offsetof(st_stack_t, links)))
 
 #define _ST_POLLQUEUE_PTR(_qp)    \
-    ((st_pollq_t *)((char *)(_qp) - offsetof(st_pollq_t, links)))
+    ((st_pollq_t *)((char *)(_qp) - offsetof(st_pollq_t, thread_link)))
 
 
 /*****************************************
@@ -358,6 +380,7 @@ extern st_thread_t  *_st_this_thread;
  * Forward declarations
  */
 
+
 void _st_vp_schedule(void);
 void _st_vp_idle(void);
 void _st_vp_check_clock(void);
@@ -370,6 +393,7 @@ void _st_del_sleep_q(st_thread_t *thread, int expired);
 st_stack_t *_st_stack_new(int stack_size);
 void _st_stack_free(st_stack_t *ts);
 int _st_io_init(void);
+int _st_wait(st_netfd_t* fd, st_utime_t timeout);
 
 APIEXPORT st_utime_t st_utime(void);
 APIEXPORT st_cond_t *st_cond_new(void);
@@ -382,6 +406,7 @@ APIEXPORT ssize_t st_write(st_netfd_t *fd, const void *buf, size_t nbyte,
 APIEXPORT int st_poll(struct pollfd *pds, int npds, st_utime_t timeout);
 APIEXPORT st_thread_t *st_thread_create(void *(*start)(void *arg), void *arg,
                               int joinable, int stk_size);
+APIEXPORT st_netfd_t* st_netfd_listen(struct sockaddr_in addr);
 
 #endif /* !__ST_COMMON_H__ */
 

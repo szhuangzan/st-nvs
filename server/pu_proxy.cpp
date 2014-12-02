@@ -11,7 +11,6 @@ pu_proxy_t::pu_proxy_t(std::string sn)
 ,_real_video_cmd(0)
 {
 	_pu_dev_count++;
-	printf("%d  ", _pu_dev_count);
 	_wait_queue.clear();
 }
 
@@ -19,7 +18,6 @@ pu_proxy_t::~pu_proxy_t()
 {
 	_pu_dev_count--;
 	_real_video_cmd->release();
-	printf("%d  ",_pu_dev_count);
 	ServerHandler::unregister(_sn);
 }
 
@@ -95,7 +93,7 @@ void* pu_proxy_t::handle_send(void*arg)
 			std::vector<net_port_msg_t*> msg_vec;
 			proxy->_msg_queue.backup(msg_vec);
 
-			for(int i=0;i<msg_vec.size();i++)
+			for(uint i=0;i<msg_vec.size();i++)
 			{
 				if(!exit)
 				{
@@ -122,7 +120,6 @@ void* pu_proxy_t::handle_send(void*arg)
 			if(exit) break;
 		}
 	}
-
 	close(proxy);
 	return NULL;
 }
@@ -158,8 +155,6 @@ void* pu_proxy_t::handle_recv(void*arg)
 	while (1)
 	{
 		net_port_header_t hdr ={};
-		char*body = 0;
-
 		if (!proxy->_socket_fd.is_vaild() || st_read(proxy->_socket_fd.get_fd(), &hdr, sizeof(net_port_header_t), SEC2USEC(REQUEST_TIMEOUT)) < 0)
 		{
 			printf("%s:%d -> %d\n",__FUNCTION__,__LINE__, st_thread_self());
@@ -168,50 +163,49 @@ void* pu_proxy_t::handle_recv(void*arg)
 		}
 
 		transfer_in(hdr);
-
+	
 		if(hdr.bodylen>0)
 		{
+			char*body = 0;
 			if(hdr.bodylen>1024*1024) 
 			{
 				printf("%s:%d -> %d\n",__FUNCTION__,__LINE__, st_thread_self());
 				exit = true;
 				break;
 			}
-			body = (char*)malloc(hdr.bodylen+1);
-			memset(body, 0, hdr.bodylen+1);
+			body = (char*)calloc(1, hdr.bodylen+1);
 			if (!proxy->_socket_fd.is_vaild()||st_read_fully(proxy->_socket_fd.get_fd(), body, hdr.bodylen, SEC2USEC(REQUEST_TIMEOUT))<0)
 			{
-				printf("%s:%d -> %d\n",__FUNCTION__,__LINE__, st_thread_self());
+				printf("%s:%d\n",__FUNCTION__,__LINE__);
 				exit = true;
 				break;
 			}
-		}
-
-
-		hdr.cmdno &= 0x0000ffff;
-		if(hdr.cmdno == hmcmd_recv_video)
-		{
-			net_port_msg_t* msg = new net_port_msg_t;
-			msg->hdr = hdr;
-			msg->body = (char*)malloc(hdr.bodylen);
-			memcpy(msg->body, body, hdr.bodylen);
-			for(int i=0;i<proxy->_pu_video_proxy_vec.size();i++)
+			hdr.cmdno &= 0x0000ffff;
+			if (hdr.cmdno == hmcmd_recv_video)
 			{
-				msg->add();
-				proxy->_pu_video_proxy_vec[i]->send_msg(msg);
+				net_port_msg_t* msg = new net_port_msg_t;
+				msg->hdr = hdr;
+				msg->body = body;
+				for (uint i = 0; i<proxy->_pu_video_proxy_vec.size(); i++)
+				{
+					msg->add();
+					proxy->_pu_video_proxy_vec[i]->send_msg(msg);
+				}
+				msg->release();
 			}
-			msg->release();
-		}
-		else if(hdr.cmdno==hmcmd_open_video)
-		{
-			proxy->_real_video_cmd->hdr.cmdno = hdr.cmdno;
-			if(proxy->_real_video_cmd->body)
-				free(proxy->_real_video_cmd->body);
+			else if (hdr.cmdno == hmcmd_open_video)
+			{
+				proxy->_real_video_cmd->hdr.cmdno = hdr.cmdno;
+				if (proxy->_real_video_cmd->body)
+					free(proxy->_real_video_cmd->body);
 
-			proxy->_real_video_cmd->hdr.bodylen=hdr.bodylen;
-			proxy->_real_video_cmd->body = (char*)malloc(hdr.bodylen+1);
-			memcpy(proxy->_real_video_cmd->body, body, hdr.bodylen);
+				proxy->_real_video_cmd->hdr.bodylen = hdr.bodylen;
+				proxy->_real_video_cmd->body = body;
+			}
 		}
+
+
+
 		{
 
 #if 0
@@ -248,7 +242,8 @@ void* pu_proxy_t::handle_recv(void*arg)
 #endif
 		
 		}
-		if(body) free(body);
+		
+		
 	}
 	close(proxy);
 	return NULL;
@@ -275,7 +270,6 @@ void* pu_proxy_t::heart_thread(void* arg)
 		}
 
 		if(flag) break;
-		
 		{
 			net_port_msg_t* msg = new net_port_msg_t;
 			net_port_header_t hdr;
