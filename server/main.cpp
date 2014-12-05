@@ -16,8 +16,17 @@ extern int server(int argc, char *argv[]);
 void* handle_connect(void*arg)
 {
 	char buf[1024] = "Provider=SQLOLEDB;Server=182.131.21.104;Database=alarm;User ID=alarm_user;Password=Huamaitel.com0822;Data Source=182.131.21.104,3199";
-	st_db_connect(buf);
-	printf("ok\n");
+	st_dbfd_t dbfd = st_db_connect(buf);
+	
+	_RecordsetPtr pRst = st_db_query(dbfd, "SELECT DeviceSN,DeviceName FROM HM_Host");
+printf("ok\n");
+
+pRst->MoveFirst();
+printf("%d thread id : %x\n", __LINE__,GetCurrentThreadId());
+while (pRst->EndOfFile == FALSE) {
+	wprintf(L"DeviceSN = '%s'\n", (wchar_t*) ((_bstr_t) pRst->Fields->GetItem("DeviceSN")->Value));
+	pRst->MoveNext();
+}
 	return NULL;
 }
 int main(int argc, char *argv[])

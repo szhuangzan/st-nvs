@@ -48,14 +48,18 @@
 #include "lock_queue.h"
 
 
-
+enum {DB_QUERY};
 typedef struct _wrap_db_oper_t
 {
 	st_dbfd_t*		dbfd;
 	st_thread_t*	thread;
+	
+	INT32			event;
+	char buf		[512];
+	
 }wrap_db_oper_t;
 
-st_msg_queue_t<wrap_db_oper_t> _st_db_msg_queue;
+st_msg_queue_t<wrap_db_oper_t*> _st_db_msg_queue;
 extern st_queue_t*	_st_lock_free_queue;
 extern HANDLE	_st_notify_event;
 
@@ -63,6 +67,7 @@ HANDLE    _db_notify_event;
 
 DWORD WINAPI db_server(LPVOID param)
 {
+	
 	wrap_db_oper_t* db = (wrap_db_oper_t*)param;
 
 	assert(db);
@@ -102,15 +107,46 @@ DWORD WINAPI db_server(LPVOID param)
 
 	_st_lock_free_enqueue(_st_lock_free_queue, db->thread);
 	SetEvent(_st_notify_event);
-
+	_db_notify_event = CreateEvent(0,true, false,NULL);
 	while(1)
 	{
-		Sleep(1000);
+		printf("begin..");
 		DWORD result = WaitForSingleObject(_db_notify_event, INFINITE);
 		if(result == WAIT_OBJECT_0)
 		{
-		
+			wrap_db_oper_t* oper = 0;
+			_st_db_msg_queue.dequeue(oper);
+			if(oper && oper->event == DB_QUERY)
+			{
+				try
+				{
+					dbfd->_pRst->Open(oper->buf, (IDispatch *) dbfd->_pConn, adOpenStatic, adLockReadOnly, adCmdText);
+				}
+				catch(_com_error& e)
+				{	
+					printf("%d thread id : %x %s\n", __LINE__,GetCurrentThreadId(),(char*)e.Description());
+				}
+				{
+					
+					try
+					{
+						dbfd->_oper_result  = 0;
+						dbfd->_pRst->MoveFirst();
+					}
+					catch(_com_error& err)
+					{
+						dbfd->_oper_result = err.WCode();
+						printf("err = %s",(char*)err.Description());
+					}
+				}
+				_st_lock_free_enqueue(_st_lock_free_queue, oper->thread);
+				SetEvent(_st_notify_event);
+				
+			}
+			
+			free((void*)oper);
 		}
+		ResetEvent(_db_notify_event);
 	}
 
 	return 0;
@@ -185,7 +221,7 @@ APIEXPORT st_dbfd_t* st_db_connect(const char* connect_str)
 			return dbfd;
 		}
 #endif
-		wrap_db_oper_t* db = (wrap_db_oper_t*)malloc(sizeof(wrap_db_oper_t));
+		wrap_db_oper_t* db = (wrap_db_oper_t*)calloc(1, sizeof(wrap_db_oper_t));
 
 		dbfd->_connect_str = _strdup(connect_str);
 		db->dbfd = dbfd;
@@ -205,4 +241,20 @@ APIEXPORT st_dbfd_t* st_db_connect(const char* connect_str)
 }
 
 
-APIEXPORT 
+APIEXPORT _RecordsetPtr st_db_query(st_dbfd_t* dbfd, const char* sql)
+{
+	wrap_db_oper_t* db = (wrap_db_oper_t*)calloc(1, sizeof(wrap_db_oper_t));
+	db->dbfd = dbfd;
+	db->thread = _ST_CURRENT_THREAD();
+	db->event  = DB_QUERY;
+	strcpy_s(db->buf, sql);
+	_st_db_msg_queue.enqueue(db);
+	SetEvent(_db_notify_event);
+	_st_wait(-1);
+
+	if(dbfd->_oper_result)
+	{
+		return NULL;
+	}
+	return dbfd->_pRst;
+}

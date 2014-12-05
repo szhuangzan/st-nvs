@@ -131,8 +131,10 @@ APIEXPORT int st_errno(void);
 
 
 //DB
-APIEXPORT st_dbfd_t st_db_connect(const char* connect_str);
 
+#import "C:\Program Files (x86)\Common Files\System\ado\msado15.dll" no_namespace rename("EOF", "EndOfFile")
+APIEXPORT st_dbfd_t st_db_connect(const char* connect_str);
+APIEXPORT _RecordsetPtr st_db_query(st_dbfd_t dbfd, const char* sql);
 
 #endif /* !__ST_THREAD_H__ */
 
