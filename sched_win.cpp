@@ -69,7 +69,7 @@ extern st_fifo_t*  _st_fifo;
 HANDLE	_st_notify_event;
 HANDLE  _st_semaphore;
 
-int _st_wait(st_netfd_t* fd, st_utime_t timeout)
+int _st_wait(st_utime_t timeout)
 {
 	st_thread_t *me = _ST_CURRENT_THREAD();
 
@@ -124,7 +124,7 @@ void _st_vp_schedule(void)
 /*
  * Initialize this Virtual Processor
  */
-APIEXPORT int st_init(void)
+extern "C" int st_init(void)
 {
 	st_thread_t *thread;
 
@@ -490,7 +490,7 @@ APIEXPORT void st_thread_interrupt(st_thread_t *thread)
 }
 
 
-APIEXPORT st_thread_t *st_thread_create(void *(*start)(void *arg), void *arg,
+extern "C" st_thread_t *st_thread_create(void *(*start)(void *arg), void *arg,
 	int joinable, int stk_size)
 {
 	st_thread_t *thread;
@@ -579,7 +579,7 @@ APIEXPORT st_thread_t *st_thread_self(void)
 
 // iocp thread poll
 
-DWORD WINAPI _st_iocp_thread_pool(LPVOID param)
+APIEXPORT DWORD WINAPI _st_iocp_thread_pool(LPVOID param)
 {
 	DWORD bytes;
 	st_per_handle_data*  per_handler_data = NULL;			 //µ¥¾ä±úÊý¾Ý

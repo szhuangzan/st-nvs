@@ -15,6 +15,9 @@ EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "database", "database\database.vcproj", "{EC14AD0D-2D6A-4714-BA4D-3D246ACD8123}"
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "HMSyncPlatformServer", "..\HMSyncPlatformServer\HMSyncPlatformServer.vcproj", "{28C178EC-C710-4311-915A-D17C2100BAA7}"
+	ProjectSection(ProjectDependencies) = postProject
+		{A5DD2BD1-A329-4C7A-8E5D-55B956B217B9} = {A5DD2BD1-A329-4C7A-8E5D-55B956B217B9}
+	EndProjectSection
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

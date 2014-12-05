@@ -15,17 +15,8 @@ static int count=0;
 extern int server(int argc, char *argv[]);
 void* handle_connect(void*arg)
 {
-	sockaddr_in addrPeer ;  
-
-	ZeroMemory (&addrPeer , sizeof (sockaddr_in ));
-
-	addrPeer.sin_family = AF_INET ;
-
-	addrPeer.sin_addr .s_addr = inet_addr ( "192.168.20.184" );
-
-	addrPeer.sin_port = htons ( 10084 );
-
-	st_connect(addrPeer, sizeof(sockaddr_in),-1);
+	char buf[1024] = "Provider=SQLOLEDB;Server=182.131.21.104;Database=alarm;User ID=alarm_user;Password=Huamaitel.com0822;Data Source=182.131.21.104,3199";
+	st_db_connect(buf);
 	printf("ok\n");
 	return NULL;
 }
@@ -33,7 +24,9 @@ int main(int argc, char *argv[])
 {
 
 	st_init();
-	st_netfd_t srvfd = NULL;
+	st_thread_create(handle_connect, 0,0,0);
+	st_sleep(10000);
+	/*st_netfd_t srvfd = NULL;
 	int n = 0;
 	struct sockaddr_in serv_addr;
 	struct hostent *hp = 0;
@@ -49,7 +42,7 @@ int main(int argc, char *argv[])
 
 	srvfd = st_netfd_listen(serv_addr);
 	st_thread_create(handle_connect, 0,0,0);
-	st_sleep(10000);
+	st_sleep(10000);*/
 	ServerHandler srv;
 
 	srv.run();

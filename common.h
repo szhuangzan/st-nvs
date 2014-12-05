@@ -55,7 +55,7 @@
 #define APIEXPORT
 #else
 
-#define APIEXPORT
+#define APIEXPORT extern "C"
 #endif
 #include <setjmp.h>
 
@@ -245,7 +245,7 @@ typedef struct _st_lock_free_queue_t
 {
 	volatile int write_cnt;
 	volatile int read_cnt;
-	volatile int length;
+	volatile LONG length;
 	void**	 thread;
 }st_lock_free_queue_t;
 
@@ -270,6 +270,11 @@ typedef struct _st_pointer_t
 {
 	struct _st_node_t* ptr;
 	LONG count;
+	_st_pointer_t()
+		:count(0),ptr(0)
+	{
+
+	}
 }st_pointer_t;
 
 
@@ -285,6 +290,21 @@ typedef struct _st_queue_t
 	st_pointer_t tail;
 }st_queue_t;
 
+
+#import "C:\Program Files (x86)\Common Files\System\ado\msado15.dll" no_namespace rename("EOF", "EndOfFile")
+typedef struct _st_dbfd_t
+{
+	IConnectionPointContainer	*_pCPC;
+	IConnectionPoint			*_pCP;
+	IUnknown					*_pUnk;
+	//CRstEvent					*_pRstEvent;
+	//CConnEvent					*_pConnEvent;
+	_RecordsetPtr				_pRst; 
+	_ConnectionPtr				_pConn;
+
+	int							_oper_result;
+	char*						_connect_str;
+}st_dbfd_t;
 /*****************************************
  * Current vp and thread
  */
@@ -424,7 +444,6 @@ extern st_thread_t  *_st_this_thread;
  * Forward declarations
  */
 
-
 void _st_vp_schedule(void);
 void _st_vp_idle(void);
 void _st_vp_check_clock(void);
@@ -437,7 +456,7 @@ void _st_del_sleep_q(st_thread_t *thread, int expired);
 st_stack_t *_st_stack_new(int stack_size);
 void _st_stack_free(st_stack_t *ts);
 int _st_io_init(void);
-int _st_wait(st_netfd_t* fd, st_utime_t timeout);
+int _st_wait(st_utime_t timeout);
 
 
  st_fifo_t *st_stack_alloc(void);
@@ -455,8 +474,7 @@ APIEXPORT int st_cond_destroy(st_cond_t *cvar);
 APIEXPORT int st_cond_timedwait(st_cond_t *cvar, st_utime_t timeout);
 APIEXPORT int st_cond_signal(st_cond_t *cvar);
 APIEXPORT ssize_t st_read(st_netfd_t *fd, void *buf, size_t nbyte, st_utime_t timeout);
-APIEXPORT ssize_t st_write(st_netfd_t *fd, const void *buf, size_t nbyte,
-                 st_utime_t timeout);
+APIEXPORT ssize_t st_write(st_netfd_t* fd, const char *buf, size_t nbyte,st_utime_t timeout);
 APIEXPORT int st_poll(struct pollfd *pds, int npds, st_utime_t timeout);
 APIEXPORT st_thread_t *st_thread_create(void *(*start)(void *arg), void *arg,
                               int joinable, int stk_size);

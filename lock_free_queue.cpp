@@ -62,45 +62,6 @@ CRITICAL_SECTION _cs;
 //	return queue;
 //}
 
-void _st_lock_free_queue_resize(st_lock_free_queue_t* queue)
-{
-	// Declare temporary size variable
-	int nNewSize = 0;	
-	void* data = NULL;
-	CRITICAL_SECTION cs;
-
-	// double the size of our queue
-	InterlockedExchangeAdd(&nNewSize,2 * queue->length);
-
-	// allocate the new array
-	data = calloc(1, sizeof(void*)*nNewSize);
-
-	// Initialize the critical section to protect the copy
-	InitializeCriticalSection(&cs);
-
-	// Enter the critical section
-	EnterCriticalSection(&cs);
-
-	// copy the old data
-	memcpy_s((void*)data, sizeof(void*)*nNewSize,(void*)queue->thread,sizeof(void*)*queue->length);		
-
-	// dump the old array
-	free(queue->thread);
-
-	// save the new array
-	queue->thread = data;
-
-	// save the new size
-	queue->length = nNewSize;
-
-	// Leave the critical section
-	LeaveCriticalSection(&cs);
-
-	// Delete the critical section
-	DeleteCriticalSection(&cs);
-
-	return;
-}
 
 
 /*void _st_lock_free_enqueue(st_lock_free_queue_t* queue, st_thread_t* thread)
@@ -227,7 +188,7 @@ void st_stack_push(st_fifo_t *fp, st_thread_cell_t *cl)
 			addr = InterlockedCompareExchangePointer((PVOID*)&fp->top, (PVOID)cl, (PVOID)cl->next);
 		}
 		Sleep(0);
-		printf("1 faile...\n");
+		
 	} while (!ok);
 }
 
@@ -255,7 +216,7 @@ st_thread_cell_t *st_stack_pop(st_fifo_t *fp)
 			addr = InterlockedCompareExchangePointer((PVOID*)&fp->top, (PVOID)next, (PVOID)head);
 		}
 		Sleep(0);
-		printf("2 faile...\n");
+	
 	} while (!ok);
 	return head;
 }
@@ -426,3 +387,4 @@ int _st_lock_free_dequeue(st_queue_t* queue, st_thread_t** thread)
 	// queue was not empty, deque succeeded
 	return 1;
 }
+

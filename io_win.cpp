@@ -56,7 +56,7 @@
 #include "common.h"
 
 
-extern DWORD WINAPI _st_iocp_thread_pool(LPVOID* param);
+extern "C" DWORD  WINAPI _st_iocp_thread_pool(LPVOID* param);
 
 #if EAGAIN != EWOULDBLOCK
 #define _IO_NOT_READY_ERROR  ((errno == EAGAIN) || (errno == EWOULDBLOCK))
@@ -176,7 +176,7 @@ int _st_io_init(void)
 
 	for(i=0; i<info.dwNumberOfProcessors*2; i++)
 	{
-		HANDLE thread = CreateThread(NULL,0,_st_iocp_thread_pool, NULL, 0, NULL);
+		HANDLE thread = CreateThread(NULL,0,(LPTHREAD_START_ROUTINE)_st_iocp_thread_pool, NULL, 0, NULL);
 		CloseHandle(thread);
 	}
 
@@ -404,11 +404,11 @@ APIEXPORT st_netfd_t * st_accept(st_netfd_t *fd, char* recv_buf, int recv_len)
 	{
 		if (WSAGetLastError() != ERROR_IO_PENDING)
 		{
-			printf("%s:%d - > %d\n",__FUNCTION__,__LINE__,WSAGetLastError());
+			//printf("%s:%d - > %d\n",__FUNCTION__,__LINE__,WSAGetLastError());
 			return NULL;
 		}
 	}
-	_st_wait(newfd, ST_UTIME_NO_TIMEOUT);
+	_st_wait(ST_UTIME_NO_TIMEOUT);
 	return newfd;
 }
 
@@ -491,26 +491,26 @@ APIEXPORT st_netfd_t* st_connect(struct sockaddr_in addr, int addrlen, st_utime_
 		temp.sin_family = AF_INET;
 		temp.sin_port = htons(0);
 		temp.sin_addr.s_addr = htonl(ADDR_ANY);
-		bind(osfd, (SOCKADDR_IN*)&temp, sizeof(SOCKADDR));
+		bind(osfd, (sockaddr*)&temp, sizeof(SOCKADDR));
 		CreateIoCompletionPort((HANDLE)osfd, _st_comletion_port, (ULONG_PTR)per_handle_data, 0);
 	}
 
-	rc = lpfnConnectEx(osfd, (SOCKADDR_IN*)&addr, addrlen, 0, 0, 0, (OVERLAPPED *)&context->overlapped);
+	rc = lpfnConnectEx(osfd, (sockaddr*)&addr, addrlen, 0, 0, 0, (OVERLAPPED *)&context->overlapped);
 	if(rc == FALSE)
 	{
 		if (WSAGetLastError() != ERROR_IO_PENDING)
 		{
 			GlobalFree(per_handle_data);
-			printf("%s:%d - > %d\n",__FUNCTION__,__LINE__,WSAGetLastError());
+			//printf("%s:%d - > %d\n",__FUNCTION__,__LINE__,WSAGetLastError());
 			return NULL;
 		}
 	}
-	_st_wait(newfd, ST_UTIME_NO_TIMEOUT);
+	_st_wait(ST_UTIME_NO_TIMEOUT);
 	return newfd;
 }
 
-#include<stdio.h>
-APIEXPORT ssize_t st_read(st_netfd_t *fd, void *buf, size_t nbyte, st_utime_t timeout)
+
+extern "C" ssize_t st_read(st_netfd_t *fd, void *buf, size_t nbyte, st_utime_t timeout)
 {
   ssize_t n = 0;
   DWORD recv_bytes = 0;
@@ -521,7 +521,7 @@ APIEXPORT ssize_t st_read(st_netfd_t *fd, void *buf, size_t nbyte, st_utime_t ti
   st_context_switch_t* context = thread->context_switch;
 
   context->operator_type = RECV_OPER;
-  context->buffer.buf = buf;
+  context->buffer.buf = (char*)buf;
   context->buffer.len = nbyte;
  
   rc = WSARecv(fd->osfd, &(context->buffer), 1,
@@ -530,11 +530,11 @@ APIEXPORT ssize_t st_read(st_netfd_t *fd, void *buf, size_t nbyte, st_utime_t ti
   {
 	  if (WSAGetLastError() != ERROR_IO_PENDING)
 	  {
-		  printf("%s:%d ->%d   %x\n", __FUNCTION__, __LINE__, WSAGetLastError(),st_thread_self());
+		//  printf("%s:%d ->%d\n", __FUNCTION__, __LINE__, WSAGetLastError());
 		  return -1;
 	  }
   }
-  _st_wait(fd, timeout);
+  _st_wait(timeout);
   return context->valid_len;
 }
 
@@ -608,35 +608,7 @@ APIEXPORT void st_get_addr(st_netfd_t* fd, char*local_addr, char* remote_addr)
 
 }
 
-APIEXPORT ssize_t st_write(st_netfd_t *fd, const char *buf, size_t nbyte,
-                           st_utime_t timeout)
-{
-  ssize_t n = 0;
-  int rc = 0;
-  ssize_t nleft = nbyte;
-  st_thread_t* thread = _ST_CURRENT_THREAD();
-  st_context_switch_t* context = thread->context_switch;
 
-  context->operator_type = SEND_OPER;
-  context->buffer.buf = (char*)buf;
-  context->buffer.len = nbyte;
-
-  //调用AcceptEx函数，地址长度需要在原有的上面加上16个字节
-  //注意这里使用了重叠模型，该函数的完成将在与完成端口关联的工作线程中处理
- 
-  rc = WSASend(fd->osfd, &(context->buffer), 1, &n, 0, &(context->overlapped), NULL);
-  if (rc != 0)
-  {
-	  if (WSAGetLastError() != ERROR_IO_PENDING)
-	  {
-		//  printf("%s:%d ->%d\n", __FUNCTION__, __LINE__, WSAGetLastError());
-		  return -1;
-	  }
-  }
-  _st_wait(fd, ST_UTIME_NO_TIMEOUT);
-
-  return (ssize_t)nbyte;
-}
 
 
 APIEXPORT ssize_t st_writev(st_netfd_t *fd, const struct iovec *iov, int iov_size,
@@ -644,6 +616,35 @@ APIEXPORT ssize_t st_writev(st_netfd_t *fd, const struct iovec *iov, int iov_siz
 {
  errno=EOPNOTSUPP;
  return(-1);
+}
+
+APIEXPORT ssize_t st_write(st_netfd_t* fd, const char *buf, size_t nbyte,st_utime_t timeout)
+{
+	DWORD n = 0;
+	int rc = 0;
+	ssize_t nleft = nbyte;
+	st_thread_t* thread = _ST_CURRENT_THREAD();
+	st_context_switch_t* context = thread->context_switch;
+
+	context->operator_type = SEND_OPER;
+	context->buffer.buf = (char*)buf;
+	context->buffer.len = nbyte;
+
+	//调用AcceptEx函数，地址长度需要在原有的上面加上16个字节
+	//注意这里使用了重叠模型，该函数的完成将在与完成端口关联的工作线程中处理
+
+	rc = WSASend(fd->osfd, &(context->buffer), 1, &n, 0, &(context->overlapped), NULL);
+	if (rc != 0)
+	{
+		if (WSAGetLastError() != ERROR_IO_PENDING)
+		{
+			//  printf("%s:%d ->%d\n", __FUNCTION__, __LINE__, WSAGetLastError());
+			return -1;
+		}
+	}
+	_st_wait(ST_UTIME_NO_TIMEOUT);
+
+	return (ssize_t)nbyte;
 }
 
 
@@ -694,5 +695,5 @@ APIEXPORT st_netfd_t *st_open(const char *path, int oflags, mode_t mode)
 
 APIEXPORT int st_wait(st_netfd_t *fd,  st_utime_t timeout)
 {
- return(_st_wait(fd,timeout));
+ return(_st_wait(timeout));
 }

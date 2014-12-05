@@ -138,6 +138,7 @@ public:
 STDMETHODIMP CConnEvent::raw_InfoMessage( struct Error *pError, 
                                          EventStatusEnum *adStatus,
                                          struct _Connection *pConnection) {
+											  printf("%d thread id : %x\n", __LINE__,GetCurrentThreadId());
    *adStatus = adStatusUnwantedEvent;
    return S_OK;
 };
@@ -192,7 +193,8 @@ STDMETHODIMP CConnEvent::raw_WillConnect( BSTR *ConnectionString,
                                           long *Options,
                                           EventStatusEnum *adStatus,
                                           struct _Connection *pConnection) {
-											  printf("%x\n",GetCurrentThreadId());
+											  printf("%d thread id : %x\n", __LINE__,GetCurrentThreadId());
+											  
    *adStatus = adStatusUnwantedEvent;
    return S_OK;
 };
@@ -200,6 +202,7 @@ STDMETHODIMP CConnEvent::raw_WillConnect( BSTR *ConnectionString,
 STDMETHODIMP CConnEvent::raw_ConnectComplete( struct Error *pError,
                                               EventStatusEnum *adStatus,
                                               struct _Connection *pConnection) {
+												  printf("%d thread id : %x\n", __LINE__,GetCurrentThreadId());
    *adStatus = adStatusUnwantedEvent;
    return S_OK;
 };
@@ -255,6 +258,7 @@ STDMETHODIMP CRstEvent::raw_RecordsetChangeComplete( EventReasonEnum adReason,
                                                      struct Error *pError,
                                                      EventStatusEnum *adStatus,
                                                      struct _Recordset *pRecordset) {
+														 printf("%d thread id : %x\n", __LINE__,GetCurrentThreadId());
    *adStatus = adStatusUnwantedEvent;
    return S_OK;
 };
@@ -270,7 +274,7 @@ STDMETHODIMP CRstEvent::raw_MoveComplete( EventReasonEnum adReason,
                                           struct Error *pError,
                                           EventStatusEnum *adStatus,
                                           struct _Recordset *pRecordset) {
-											  printf("SSSSSSSSS");
+											 printf("%d thread id : %x\n", __LINE__,GetCurrentThreadId());
    *adStatus = adStatusUnwantedEvent;
    return S_OK;
 };
@@ -278,6 +282,7 @@ STDMETHODIMP CRstEvent::raw_MoveComplete( EventReasonEnum adReason,
 STDMETHODIMP CRstEvent::raw_EndOfRecordset( VARIANT_BOOL *fMoreData,
                                             EventStatusEnum *adStatus,
                                             struct _Recordset *pRecordset) {
+												printf("%d thread id : %x\n", __LINE__,GetCurrentThreadId());
    *adStatus = adStatusUnwantedEvent;
    return S_OK;
 };
@@ -419,7 +424,10 @@ int main() {
    // Do some work
    pConn->Open("Provider=SQLOLEDB;Server=182.131.21.104;Database=alarm;User ID=alarm_user;Password=Huamaitel.com0822;Data Source=182.131.21.104,3199", "", "", adAsyncConnect);
     printf("%d thread id : %x\n", __LINE__,GetCurrentThreadId());
-	Sleep(1000);
+	
+
+
+	Sleep(10000);	
 	try
 	{
    pRst->Open("SELECT DeviceSN,DeviceName FROM HM_Host", (IDispatch *) pConn, adOpenStatic, adLockReadOnly, adCmdText|adAsyncExecute);
@@ -429,7 +437,9 @@ int main() {
 		 printf("%d thread id : %x %s\n", __LINE__,GetCurrentThreadId(),(char*)e.Description());
 		
 	}
-Sleep(1000);
+
+
+Sleep(10000);	
    pRst->MoveFirst();
     printf("%d thread id : %x\n", __LINE__,GetCurrentThreadId());
    while (pRst->EndOfFile == FALSE) {
@@ -438,9 +448,10 @@ Sleep(1000);
    }
 
     printf("%d thread id : %x\n", __LINE__,GetCurrentThreadId());
-   pRst->Close();
+	Sleep(10000);
+ pRst->Close();
    pConn->Close();
-
+	Sleep(10000);
    // Stop using the Connection events
    hr = pConn->QueryInterface(__uuidof(IConnectionPointContainer), (void **) &pCPC);
 

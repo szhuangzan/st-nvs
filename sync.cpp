@@ -118,7 +118,7 @@ APIEXPORT int st_usleep(st_utime_t usecs)
 }
 
 
-APIEXPORT int st_sleep(int secs)
+extern "C" int st_sleep(int secs)
 {
   if(secs == -1) return(st_usleep(-1));
   else return(st_usleep(secs * 1000000));

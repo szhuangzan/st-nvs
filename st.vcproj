@@ -173,7 +173,7 @@
 			Filter="cpp;c;cxx;rc;def;r;odl;idl;hpj;bat"
 			>
 			<File
-				RelativePath=".\io_win.c"
+				RelativePath=".\io_win.cpp"
 				>
 				<FileConfiguration
 					Name="Debug|Win32"
@@ -193,7 +193,7 @@
 				</FileConfiguration>
 			</File>
 			<File
-				RelativePath="key.c"
+				RelativePath=".\key.cpp"
 				>
 				<FileConfiguration
 					Name="Debug|Win32"
@@ -213,31 +213,11 @@
 				</FileConfiguration>
 			</File>
 			<File
-				RelativePath=".\lock_free_queue.c"
+				RelativePath=".\lock_free_queue.cpp"
 				>
 			</File>
 			<File
-				RelativePath="sched_win.c"
-				>
-				<FileConfiguration
-					Name="Debug|Win32"
-					>
-					<Tool
-						Name="VCCLCompilerTool"
-						PreprocessorDefinitions=""
-					/>
-				</FileConfiguration>
-				<FileConfiguration
-					Name="Release|Win32"
-					>
-					<Tool
-						Name="VCCLCompilerTool"
-						PreprocessorDefinitions=""
-					/>
-				</FileConfiguration>
-			</File>
-			<File
-				RelativePath="stk.c"
+				RelativePath=".\sched_win.cpp"
 				>
 				<FileConfiguration
 					Name="Debug|Win32"
@@ -257,7 +237,27 @@
 				</FileConfiguration>
 			</File>
 			<File
-				RelativePath="sync.c"
+				RelativePath=".\stk.cpp"
+				>
+				<FileConfiguration
+					Name="Debug|Win32"
+					>
+					<Tool
+						Name="VCCLCompilerTool"
+						PreprocessorDefinitions=""
+					/>
+				</FileConfiguration>
+				<FileConfiguration
+					Name="Release|Win32"
+					>
+					<Tool
+						Name="VCCLCompilerTool"
+						PreprocessorDefinitions=""
+					/>
+				</FileConfiguration>
+			</File>
+			<File
+				RelativePath=".\sync.cpp"
 				>
 				<FileConfiguration
 					Name="Debug|Win32"
@@ -285,7 +285,7 @@
 					>
 				</File>
 				<File
-					RelativePath=".\LockFreeQ.h"
+					RelativePath=".\lock_queue.h"
 					>
 				</File>
 				<File
@@ -298,6 +298,14 @@
 				</File>
 				<File
 					RelativePath="st.h"
+					>
+				</File>
+			</Filter>
+			<Filter
+				Name="DB"
+				>
+				<File
+					RelativePath=".\db_sqlserver.cpp"
 					>
 				</File>
 			</Filter>

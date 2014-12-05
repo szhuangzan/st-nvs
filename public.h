@@ -93,7 +93,7 @@ extern void *st_thread_getspecific(int key);
 extern st_netfd_t st_netfd_open(int osfd);
 extern st_netfd_t st_netfd_open_socket(int osfd);
 extern void st_netfd_free(st_netfd_t fd);
-extern int st_netfd_close(st_netfd_t fd);
+extern "C" int st_netfd_close(st_netfd_t fd);
 extern int st_netfd_fileno(st_netfd_t fd);
 extern void st_netfd_setspecific(st_netfd_t fd, void *value,
                                  void (*destructor)(void *));

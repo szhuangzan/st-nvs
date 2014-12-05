@@ -129,7 +129,7 @@ public:
 //////////////////////////////
 
 template< class T >
-class MSQueue
+class st_msg_queue_t
 {
 private:
 
@@ -183,12 +183,12 @@ private:
 	}
 public:	
 	// default constructor
-	MSQueue()
+	st_msg_queue_t()
 	{
 		node_t* pNode = new node_t();
 		Head.ptr = Tail.ptr = pNode;
 	}
-	~MSQueue()
+	~st_msg_queue_t()
 	{
 		// remove the dummy head
 		delete Head.ptr;

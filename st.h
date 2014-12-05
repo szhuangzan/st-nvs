@@ -45,15 +45,13 @@
 #endif
 
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+
 
 #ifdef WIN32
 typedef int ssize_t;
 typedef int mode_t;
 typedef int pid_t;
-#define APIEXPORT
+#define APIEXPORT extern "C"
 #else
 #define APIEXPORT
 #endif
@@ -62,6 +60,7 @@ typedef void *st_thread_t;
 typedef void *st_cond_t;
 typedef void *st_mutex_t;
 typedef void *st_netfd_t;
+typedef void *st_dbfd_t;
 
 APIEXPORT int st_init(void);
 
@@ -98,7 +97,7 @@ APIEXPORT void *st_thread_getspecific(int key);
 APIEXPORT st_netfd_t st_netfd_open(int osfd);
 APIEXPORT st_netfd_t st_netfd_open_socket(int osfd);
 APIEXPORT void st_netfd_free(st_netfd_t fd);
-APIEXPORT int st_netfd_close(st_netfd_t fd);
+extern "C" int st_netfd_close(st_netfd_t fd);
 APIEXPORT int st_netfd_fileno(st_netfd_t fd);
 APIEXPORT void st_netfd_setspecific(st_netfd_t fd, void *value,
                                  void (*destructor)(void *));
@@ -116,7 +115,7 @@ APIEXPORT ssize_t st_read(st_netfd_t fd, void *buf, size_t nbyte,
                        st_utime_t timeout);
 APIEXPORT ssize_t st_read_fully(st_netfd_t fd, void *buf, size_t nbyte,
                              st_utime_t timeout);
-APIEXPORT ssize_t st_write(st_netfd_t fd, const void *buf, size_t nbyte,
+APIEXPORT ssize_t st_write(st_netfd_t fd, const char *buf, size_t nbyte,
                         st_utime_t timeout);
 APIEXPORT ssize_t st_writev(st_netfd_t fd, const struct iovec *iov, int iov_size,
                          st_utime_t timeout);
@@ -129,9 +128,11 @@ APIEXPORT st_netfd_t st_open(const char *path, int oflags, mode_t mode);
 
 APIEXPORT int st_errno(void);
 
-#ifdef __cplusplus
-}
-#endif
+
+
+//DB
+APIEXPORT st_dbfd_t st_db_connect(const char* connect_str);
+
 
 #endif /* !__ST_THREAD_H__ */
 
