@@ -63,6 +63,11 @@ st_utime_t _st_last_tset;       /* Last time it was fetched */
 extern HANDLE  _st_comletion_port;
 #endif
 
+extern st_queue_t*	_st_lock_free_queue;
+extern st_fifo_t*  _st_fifo;
+
+HANDLE	_st_notify_event;
+HANDLE  _st_semaphore;
 
 int _st_wait(st_netfd_t* fd, st_utime_t timeout)
 {
@@ -101,14 +106,18 @@ void _st_vp_schedule(void)
 		thread->state = _ST_ST_RUNNING;
 		_ST_RESTORE_CONTEXT(thread);
 	}
+
    {
 		/* If there are no threads to run, switch to the idle thread */
 		thread = _st_this_vp.idle_thread;
+		ST_ASSERT(thread->state == _ST_ST_RUNNABLE);
+		thread->state = _ST_ST_RUNNING;
+		_ST_RESTORE_CONTEXT(thread);
+		/* Resume the thread */
+	
 	}
-	ST_ASSERT(thread->state == _ST_ST_RUNNABLE);
-	/* Resume the thread */
-	thread->state = _ST_ST_RUNNING;
-	_ST_RESTORE_CONTEXT(thread);
+
+
 }
 
 
@@ -162,6 +171,8 @@ APIEXPORT int st_init(void)
 	_ST_SET_CURRENT_THREAD(thread);
 	_st_active_count++;
 
+	_st_notify_event = CreateEvent(NULL, TRUE, FALSE, NULL);
+	_st_semaphore		 = CreateSemaphore(NULL, 0, 10,NULL);
 	return 0;
 }
 
@@ -198,9 +209,8 @@ void _st_vp_idle(void)
 {
 	struct timeval timeout, *tvp = 0;
 	st_utime_t min_timeout;
-	DWORD bytes;
-	st_per_handle_data*  per_handler_data = NULL;			 //单句柄数据
-	st_context_switch_t* context = NULL;
+	st_thread_t* thread=0;
+	DWORD	ret = 0;
 
 	if (ST_CLIST_IS_EMPTY(&_ST_SLEEPQ)) {
 		tvp = NULL;
@@ -212,51 +222,50 @@ void _st_vp_idle(void)
 		tvp = &timeout;
 	}
 
-	do
-	{
-		int  ret = 0;
-		int err  = 0;
-		bytes = -1;
-		ret = GetQueuedCompletionStatus(
-				_st_comletion_port,                 //原先的完成端口句柄
-				&bytes,							 //重叠操作完成的字节数
-				(LPDWORD)&per_handler_data,			//原先和完成端口句柄关联起来的单句柄数据
-				(LPOVERLAPPED*)&context,		 //用于接收已完成的IO操作的重叠结构
-				1000);
-		err = WSAGetLastError();
-		if (!context) break;
-		if ((!ret || bytes == 0) && context->operator_type != ACCEPT_OPER)
-		{
-			printf("%s : %d\n", __FUNCTION__, __LINE__);
-			closesocket(per_handler_data->socket);
-			// GlobalFree(per_handler_data);
-			errno = _st_GetError(0);
-			context->valid_len = -1;
-			break;
-		}
-		context->valid_len = bytes;
-		//这是AcceptEx函数处理完成，在下面处理
-		if (context->operator_type == ACCEPT_OPER)     //处理连接操作
-		{
-			per_handler_data->socket = context->osfd;
-			CreateIoCompletionPort((HANDLE)per_handler_data->socket,
-				_st_comletion_port, (ULONG_PTR)per_handler_data, 0);
-		}
+	ret = WaitForSingleObject(_st_notify_event, 1000);
 
-	}
-	while (0);
+	if(ret == WAIT_OBJECT_0)
 	{
-		if (context)
+		while(_st_lock_free_dequeue(_st_lock_free_queue, &thread))
 		{
-			if (context->thread->flags & _ST_FL_ON_SLEEPQ)
-				_ST_DEL_SLEEPQ(context->thread, 0);
-			context->thread->state = _ST_ST_RUNNABLE;
-			_ST_ADD_RUNQ(context->thread);
+			if (thread->flags & _ST_FL_ON_SLEEPQ)
+				_ST_DEL_SLEEPQ(thread, 0);
+			thread->state = _ST_ST_RUNNABLE;
+			_ST_ADD_RUNQ(thread);
 		}
+		/*else
+		{
+			printf("fail....\n");
+		}*/
 
+		//while(thread = _st_lock_free_dequeue(_st_lock_free_queue))
+		//{
+		//	if (thread)
+		//	{
+		//		if (thread->flags & _ST_FL_ON_SLEEPQ)
+		//			_ST_DEL_SLEEPQ(thread, 0);
+		//		thread->state = _ST_ST_RUNNABLE;
+
+		//		_ST_ADD_RUNQ(thread);
+		//	}
+		//}
+	/*	st_thread_cell_t* cell = st_stack_pop(_st_fifo);
+		{
+			if (cell && cell->thread)
+			{
+				if (cell->thread->flags & _ST_FL_ON_SLEEPQ)
+					_ST_DEL_SLEEPQ(thread, 0);
+				cell->thread->state = _ST_ST_RUNNABLE;
+				
+				_ST_ADD_RUNQ(cell->thread);
+			}
+		}*/
+		//	http://wenku.baidu.com/view/44ff811455270722192ef7fb.html
+		
+		
 	}
+	ResetEvent(_st_notify_event);
 }
-
 
 
 APIEXPORT void st_thread_exit(void *retval)
@@ -565,3 +574,60 @@ APIEXPORT st_thread_t *st_thread_self(void)
 	return _ST_CURRENT_THREAD();
 }
 
+
+
+
+// iocp thread poll
+
+DWORD WINAPI _st_iocp_thread_pool(LPVOID param)
+{
+	DWORD bytes;
+	st_per_handle_data*  per_handler_data = NULL;			 //单句柄数据
+	st_context_switch_t* context = NULL;
+
+	int  ret = 0;
+	int	 err  = 0;
+
+	while(1)
+	{
+		bytes = -1;
+		ret = GetQueuedCompletionStatus(
+			_st_comletion_port,                 //原先的完成端口句柄
+			&bytes,							 //重叠操作完成的字节数
+			(LPDWORD)&per_handler_data,			//原先和完成端口句柄关联起来的单句柄数据
+			(LPOVERLAPPED*)&context,		 //用于接收已完成的IO操作的重叠结构
+			INFINITE);
+		context->valid_len = -1;
+		err = WSAGetLastError();
+		if (!context){printf("exit...\n"); break;}
+		if ((!ret || bytes == 0) && context->operator_type != ACCEPT_OPER && context->operator_type != CONNECT_OPER)
+		{
+			printf("%s : %d\n", __FUNCTION__, __LINE__);
+			closesocket(per_handler_data->socket);
+			// GlobalFree(per_handler_data);
+			errno = _st_GetError(0);
+		}
+
+		if (context)
+		{
+			context->valid_len = bytes;
+
+			//这是AcceptEx函数处理完成，在下面处理
+			if (context->operator_type == ACCEPT_OPER)     //处理连接操作
+			{
+				per_handler_data->socket = context->osfd;
+				CreateIoCompletionPort((HANDLE)per_handler_data->socket,
+					_st_comletion_port, (ULONG_PTR)per_handler_data, 0);
+			}
+			//st_thread_cell_t*cell = (st_thread_cell_t*)calloc(1,sizeof(st_thread_cell_t));
+		//	cell->thread = context->thread;
+			//st_stack_push(_st_fifo, cell);
+			//_st_lock_free_enqueue(_st_lock_free_queue, context->thread);
+			//ReleaseSemaphore(_st_semaphore,1,&count);
+			_st_lock_free_enqueue(_st_lock_free_queue, context->thread);
+			SetEvent(_st_notify_event);
+		}
+		
+	}
+	return 0;
+}

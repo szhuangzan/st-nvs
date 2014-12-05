@@ -55,6 +55,9 @@
 #include <errno.h>
 #include "common.h"
 
+
+extern DWORD WINAPI _st_iocp_thread_pool(LPVOID* param);
+
 #if EAGAIN != EWOULDBLOCK
 #define _IO_NOT_READY_ERROR  ((errno == EAGAIN) || (errno == EWOULDBLOCK))
 #else
@@ -67,6 +70,8 @@ static WSADATA wsadata;
 
 // 完成端口
 HANDLE  _st_comletion_port;
+st_queue_t*	_st_lock_free_queue;
+st_fifo_t*   _st_fifo;
 
 /* File descriptor object free list */
 static st_netfd_t *_st_netfd_freelist = NULL;
@@ -153,15 +158,31 @@ size_t getpagesize(void)
 int _st_io_init(void)
 {
 	int result = 0;
-  WSAStartup(2,&wsadata);
-  //创建一个IO完成端口
-	_st_comletion_port = CreateIoCompletionPort(INVALID_HANDLE_VALUE,NULL,0,0);
+	unsigned i = 0;
+	SYSTEM_INFO info;
+
+    WSAStartup(2,&wsadata);
+
+	
+	_st_comletion_port = CreateIoCompletionPort(INVALID_HANDLE_VALUE,NULL,0,0); //创建一个IO完成端口
+
 	if(!_st_comletion_port)
 	{
 		result = GetLastError();
 	}
-			
-  return result;
+
+	//创建线程池
+	GetSystemInfo(&info);  
+
+	for(i=0; i<info.dwNumberOfProcessors*2; i++)
+	{
+		HANDLE thread = CreateThread(NULL,0,_st_iocp_thread_pool, NULL, 0, NULL);
+		CloseHandle(thread);
+	}
+
+	_st_lock_free_queue = _st_lock_free_queue_open();
+	_st_fifo = (st_fifo_t*)calloc(1, sizeof(st_fifo_t));
+	 return result;
 }
 
 
@@ -383,7 +404,7 @@ APIEXPORT st_netfd_t * st_accept(st_netfd_t *fd, char* recv_buf, int recv_len)
 	{
 		if (WSAGetLastError() != ERROR_IO_PENDING)
 		{
-			printf("%s:%d -> %d\n", __FUNCTION__, __LINE__, WSAGetLastError());
+			printf("%s:%d - > %d\n",__FUNCTION__,__LINE__,WSAGetLastError());
 			return NULL;
 		}
 	}
@@ -392,10 +413,100 @@ APIEXPORT st_netfd_t * st_accept(st_netfd_t *fd, char* recv_buf, int recv_len)
 }
 
 
-APIEXPORT int st_connect(st_netfd_t *fd, struct sockaddr *addr, int addrlen,
-                         st_utime_t timeout)
+APIEXPORT st_netfd_t* st_connect(struct sockaddr_in addr, int addrlen, st_utime_t timeout)
 {
-  return(0);
+
+	int rc = 0;
+	st_per_handle_data* per_handle_data = NULL;
+	st_netfd_t* newfd = NULL;
+	SOCKET osfd = -1;
+
+	st_thread_t* thread = _ST_CURRENT_THREAD();
+	st_context_switch_t* context = thread->context_switch;
+
+	LPFN_CONNECTEX lpfnConnectEx = NULL;     //AcceptEx函数指针
+	//Accept function GUID
+	GUID guidConnectEx = WSAID_CONNECTEX;
+	//get acceptex function pointer
+	DWORD dwBytes = 0;
+
+	osfd = WSASocket(AF_INET, SOCK_STREAM, IPPROTO_TCP, 0, 0, WSA_FLAG_OVERLAPPED);
+	newfd = _st_netfd_new(osfd, 1, 1);
+
+	if (WSAIoctl(newfd->osfd, SIO_GET_EXTENSION_FUNCTION_POINTER,
+		&guidConnectEx, sizeof(guidConnectEx), &lpfnConnectEx, sizeof(lpfnConnectEx),
+		&dwBytes, NULL, NULL) == 0)
+	{
+	}
+	else{
+		switch(WSAGetLastError())
+		{
+		case WSAENETDOWN:
+
+			break;
+		case WSAEFAULT:
+
+			break;
+		case WSAEINVAL:
+
+			break;
+		case WSAEINPROGRESS:
+
+			break;
+		case WSAENOTSOCK:
+
+			break;
+		case WSAEOPNOTSUPP:
+
+			break;
+		case WSA_IO_PENDING:
+
+			break;
+		case WSAEWOULDBLOCK:
+
+			break;
+		case WSAENOPROTOOPT:
+
+			break;
+		}
+		return NULL;
+	}
+
+
+	//在使用AcceptEx前需要事先重建一个套接字用于其第二个参数。这样目的是节省时间
+	//通常可以创建一个套接字库
+
+
+	//调用AcceptEx函数，地址长度需要在原有的上面加上16个字节
+	//注意这里使用了重叠模型，该函数的完成将在与完成端口关联的工作线程中处理
+	context->osfd = osfd;
+	context->operator_type = CONNECT_OPER;
+
+	{
+		SOCKADDR_IN temp;
+		
+		per_handle_data = (st_per_handle_data*)GlobalAlloc(GPTR, sizeof(st_per_handle_data));
+		per_handle_data->socket = osfd;
+		
+		temp.sin_family = AF_INET;
+		temp.sin_port = htons(0);
+		temp.sin_addr.s_addr = htonl(ADDR_ANY);
+		bind(osfd, (SOCKADDR_IN*)&temp, sizeof(SOCKADDR));
+		CreateIoCompletionPort((HANDLE)osfd, _st_comletion_port, (ULONG_PTR)per_handle_data, 0);
+	}
+
+	rc = lpfnConnectEx(osfd, (SOCKADDR_IN*)&addr, addrlen, 0, 0, 0, (OVERLAPPED *)&context->overlapped);
+	if(rc == FALSE)
+	{
+		if (WSAGetLastError() != ERROR_IO_PENDING)
+		{
+			GlobalFree(per_handle_data);
+			printf("%s:%d - > %d\n",__FUNCTION__,__LINE__,WSAGetLastError());
+			return NULL;
+		}
+	}
+	_st_wait(newfd, ST_UTIME_NO_TIMEOUT);
+	return newfd;
 }
 
 #include<stdio.h>
@@ -419,7 +530,7 @@ APIEXPORT ssize_t st_read(st_netfd_t *fd, void *buf, size_t nbyte, st_utime_t ti
   {
 	  if (WSAGetLastError() != ERROR_IO_PENDING)
 	  {
-		  printf("%s:%d ->%d\n", __FUNCTION__, __LINE__, WSAGetLastError());
+		  printf("%s:%d ->%d   %x\n", __FUNCTION__, __LINE__, WSAGetLastError(),st_thread_self());
 		  return -1;
 	  }
   }
@@ -433,23 +544,28 @@ APIEXPORT ssize_t st_read_fully(st_netfd_t *fd, void *buf, size_t nbyte,
 {
   size_t nleft = nbyte;
   int n = 0;
+//  printf("%s:%d    %x\n",__FUNCTION__,__LINE__,st_thread_self());	
   while (nleft > 0)
   {
+	 //  printf("%s:%d    %x\n",__FUNCTION__,__LINE__,st_thread_self());		
 	  if ((n = st_read(fd, buf, nleft, timeout)) < 0)
 	{
-		assert(0);
       errno=_st_GetError(0);
       if (errno == EINTR)
         continue;
         return -1;
     } else {
+		
+			
+	//  printf("1 %s:%d nleft = %d, n= %d         %x\n",__FUNCTION__,__LINE__, nleft, n, st_thread_self());	
       nleft -= n;
+	//  printf("2 %s:%d nleft = %d, n= %d          %x\n",__FUNCTION__,__LINE__, nleft, n,st_thread_self());	
       if (nleft == 0 || n == 0)
         break;
+	 // printf("3 %s:%d nleft = %d, n= %d          %x\n",__FUNCTION__,__LINE__, nleft, n,st_thread_self());	
       buf = (void *)((char *)buf + n);
     }
   }
-  assert(nleft == 0);
   return (ssize_t)(nbyte - nleft);
 }
 
@@ -513,7 +629,7 @@ APIEXPORT ssize_t st_write(st_netfd_t *fd, const char *buf, size_t nbyte,
   {
 	  if (WSAGetLastError() != ERROR_IO_PENDING)
 	  {
-		  printf("%s:%d ->%d\n", __FUNCTION__, __LINE__, WSAGetLastError());
+		//  printf("%s:%d ->%d\n", __FUNCTION__, __LINE__, WSAGetLastError());
 		  return -1;
 	  }
   }

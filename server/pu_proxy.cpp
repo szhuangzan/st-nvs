@@ -3,7 +3,7 @@
 #include "cu_proxy.hpp"
 #include <cassert>
 #include <algorithm>
-#include "server.hpp"]
+#include "server.hpp"
 
 uint32 pu_proxy_t::_pu_dev_count = 0;
 pu_proxy_t::pu_proxy_t(std::string sn)
@@ -110,13 +110,14 @@ void* pu_proxy_t::handle_send(void*arg)
 					if(bodylen >0) memcpy(send_buf+sizeof(net_port_header_t), msg_vec[i]->body, bodylen);
 					if (!proxy->_socket_fd.is_vaild() || st_write(proxy->_socket_fd.get_fd(), send_buf , sendlen,SEC2USEC(REQUEST_TIMEOUT))<0)
 					{
-						printf("%s:%d -> %d\n",__FUNCTION__,__LINE__, st_thread_self());
+					//	printf("%s:%d -> %d\n",__FUNCTION__,__LINE__, st_thread_self());
 						exit = true;
 					}
 					
 				}
 				msg_vec[i]->release();
 			}
+			msg_vec.clear();
 			if(exit) break;
 		}
 	}
@@ -155,6 +156,7 @@ void* pu_proxy_t::handle_recv(void*arg)
 	while (1)
 	{
 		net_port_header_t hdr ={};
+		
 		if (!proxy->_socket_fd.is_vaild() || st_read(proxy->_socket_fd.get_fd(), &hdr, sizeof(net_port_header_t), SEC2USEC(REQUEST_TIMEOUT)) < 0)
 		{
 			printf("%s:%d -> %d\n",__FUNCTION__,__LINE__, st_thread_self());
@@ -166,10 +168,10 @@ void* pu_proxy_t::handle_recv(void*arg)
 	
 		if(hdr.bodylen>0)
 		{
+			
 			char*body = 0;
 			if(hdr.bodylen>1024*1024) 
 			{
-				printf("%s:%d -> %d\n",__FUNCTION__,__LINE__, st_thread_self());
 				exit = true;
 				break;
 			}

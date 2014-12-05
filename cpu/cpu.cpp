@@ -1,81 +1,175 @@
-#include <windows.h>
-#include <stdio.h>
-#include <math.h>
+// node structure
 
-//把一条正弦曲线0~2pi 之间的弧度等分200份抽样，计算每个点的振幅
-//然后每隔300ms设置下一个抽样点,并让cpu工作对应振幅时间
-const int samplingCount = 200; //抽样点数目
-const double pi = 3.1415926;
-const int totalAmplitude = 300; //每个抽样点对应时间片
-const double delta = 2.0/samplingCount;  //抽样弧度的增量
 
-int busySpan[samplingCount];//每个抽样点对应的busy时间
-int idleSpan[samplingCount];//每个抽样点对应的idle时间
 
-//一个线程调用MakeUsageSin，并把该线程绑定到一个cpu，那么该cpu呈现正弦曲线
-DWORD WINAPI MakeUsageSin(LPVOID lpParameter)
+class MSQueue
 {
-	DWORD startTime = 0;
-	for(int j = 0; ; j = (j + 1) % samplingCount)
-	{
-		startTime = GetTickCount();
-		while ((GetTickCount() - startTime) < busySpan[j]);
-		Sleep(idleSpan[j]);
-	}
-}
+private:
 
-//如果cpuindex < 0 则所有cpu都显示正弦曲线
-//否则只有第 cpuindex个cpu显示正弦曲线
-//cpuindex 从 0 开始计数
-void CpuSin(int cpuIndex)
-{
-	//计算 busySpan 和 idleSpan
-	double radian = 0;
-	int amplitude = totalAmplitude / 2;
-	for (int i = 0; i < samplingCount; i++)
-	{
-		busySpan[i] = (DWORD)(amplitude + sin(pi*radian)*amplitude);
-		idleSpan[i] = totalAmplitude - busySpan[i];
-		radian += delta;
-	}
+	// pointer structure
+	struct node_t;
 
-	//获取系统cup数量
-	SYSTEM_INFO SysInfo;
-	GetSystemInfo(&SysInfo);
-	int num_processors = SysInfo.dwNumberOfProcessors;
-	if(cpuIndex + 1 > num_processors)
+	struct pointer_t 
 	{
-		printf("error: the index of cpu is out of boundary\n");
-		printf("cpu number: %d\n", num_processors);
-		printf("your index: %d\n", cpuIndex);
-		printf("** tip: the index of cpu start from 0 **\n");
-		return;
-	}
-
-	if(cpuIndex < 0)
-	{
-		HANDLE* threads = new HANDLE[num_processors];
-		for (int i = 0;i < num_processors;i++)
+		node_t* ptr;
+		LONG count;
+		// default to a null pointer with a count of zero
+		pointer_t(): ptr(NULL),count(0){}
+		pointer_t(node_t* node, const LONG c ) : ptr(node),count(c){}
+		pointer_t(const pointer_t& p)
 		{
-			DWORD mask = 1<<i;
-			threads[i] = CreateThread(NULL, 0, MakeUsageSin, &mask, 0, NULL);
-			SetThreadAffinityMask(threads[i], 1<<i);//线程指定在某个cpu运行
+			InterlockedExchange(&count,p.count);
+			InterlockedExchangePointer(&ptr,p.ptr);
 		}
-		WaitForMultipleObjects(num_processors, threads, TRUE, INFINITE);
-	}
-	else
+
+		pointer_t(const pointer_t* p): ptr(NULL),count(0)
+		{
+			if(NULL == p)
+				return;
+
+			InterlockedExchange(&count,const_cast< LONG >(p->count));
+			InterlockedExchangePointer(ptr,const_cast< node_t* >(p->ptr));			
+		}
+
+	};
+
+
+
+	pointer_t Head;
+	pointer_t Tail;
+	bool CAS(pointer_t& dest,pointer_t& compare, pointer_t& value)
 	{
-		HANDLE thread;
-		DWORD mask = 1;
-		thread = CreateThread(NULL, 0, MakeUsageSin, &mask, 0, NULL);
-		SetThreadAffinityMask(thread, 1<<cpuIndex);
-		WaitForSingleObject(thread,INFINITE);
+		if(compare.ptr==InterlockedCompareExchangePointer((PVOID volatile*)&dest.ptr,value.ptr,compare.ptr))
+		{
+			InterlockedExchange(&dest.count,value.count);
+			return true;
+		}
+
+		return false;
+	}
+public:	
+	// default constructor
+	MSQueue()
+	{
+		node_t* pNode = new node_t();
+		Head.ptr = Tail.ptr = pNode;
+	}
+	~MSQueue()
+	{
+		// remove the dummy head
+		delete Head.ptr;
 	}
 
-}
-int main()
-{
+	// insert items of class T in the back of the queue
+	// items of class T must implement a default and copy constructor
+	// Enqueue method
+	void enqueue(const T& t)
+	{
+		// Allocate a new node from the free list
+		node_t* pNode = new node_t(); 
 
-	CpuSin(0);
-	return 0;
-}
+		// Copy enqueued value into node
+		pNode->value = t;
+
+		// Keep trying until Enqueue is done
+		bool bEnqueueNotDone = true;
+
+		while(bEnqueueNotDone)
+		{
+			// Read Tail.ptr and Tail.count together
+			pointer_t tail(Tail);
+
+			bool nNullTail = (NULL==tail.ptr); 
+			// Read next ptr and count fields together
+			pointer_t next( // ptr 
+				(nNullTail)? NULL : tail.ptr->next.ptr,
+				// count
+				(nNullTail)? 0 : tail.ptr->next.count
+				) ;
+
+
+			// Are tail and next consistent?
+			if(tail.count == Tail.count && tail.ptr == Tail.ptr)
+			{
+				if(NULL == next.ptr) // Was Tail pointing to the last node?
+				{
+					// Try to link node at the end of the linked list										
+					if(CAS( tail.ptr->next, next, pointer_t(pNode,next.count+1) ) )
+					{
+						bEnqueueNotDone = false;
+					} // endif
+
+				} // endif
+
+				else // Tail was not pointing to the last node
+				{
+					// Try to swing Tail to the next node
+					CAS(Tail, tail, pointer_t(next.ptr,tail.count+1) );
+				}
+
+			} // endif
+
+		} // endloop
+	}
+
+	// remove items of class T from the front of the queue
+	// items of class T must implement a default and copy constructor
+	// Dequeue method
+	bool dequeue(T& t)
+	{
+		pointer_t head;
+		// Keep trying until Dequeue is done
+		bool bDequeNotDone = true;
+		while(bDequeNotDone)
+		{
+			// Read Head
+			head = Head;
+			// Read Tail
+			pointer_t tail(Tail);
+
+			if(head.ptr == NULL)
+			{
+				// queue is empty
+				return false;
+			}
+
+			// Read Head.ptr->next
+			pointer_t next(head.ptr->next);
+
+			// Are head, tail, and next consistent
+			if(head.count == Head.count && head.ptr == Head.ptr)
+			{
+				if(head.ptr == tail.ptr) // is tail falling behind?
+				{
+					// Is the Queue empty
+					if(NULL == next.ptr)
+					{
+						// queue is empty cannot deque
+						return false;
+					}
+					CAS(Tail,tail, pointer_t(next.ptr,tail.count+1)); // Tail is falling behind. Try to advance it
+				} // endif
+
+				else // no need to deal with tail
+				{
+					// read value before CAS otherwise another deque might try to free the next node
+					t = next.ptr->value;
+
+					// try to swing Head to the next node
+					if(CAS(Head,head, pointer_t(next.ptr,head.count+1) ) )
+					{
+						bDequeNotDone = false;
+					}
+				}
+
+			} // endif
+
+		} // endloop
+
+		// It is now safe to free the old dummy node
+		delete head.ptr;
+
+		// queue was not empty, deque succeeded
+		return true;
+	}
+};

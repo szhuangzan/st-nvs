@@ -173,7 +173,7 @@
 			Filter="cpp;c;cxx;rc;def;r;odl;idl;hpj;bat"
 			>
 			<File
-				RelativePath="io_win.c"
+				RelativePath=".\io_win.c"
 				>
 				<FileConfiguration
 					Name="Debug|Win32"
@@ -211,6 +211,10 @@
 						PreprocessorDefinitions=""
 					/>
 				</FileConfiguration>
+			</File>
+			<File
+				RelativePath=".\lock_free_queue.c"
+				>
 			</File>
 			<File
 				RelativePath="sched_win.c"
@@ -278,6 +282,10 @@
 				>
 				<File
 					RelativePath="common.h"
+					>
+				</File>
+				<File
+					RelativePath=".\LockFreeQ.h"
 					>
 				</File>
 				<File

@@ -192,6 +192,7 @@ STDMETHODIMP CConnEvent::raw_WillConnect( BSTR *ConnectionString,
                                           long *Options,
                                           EventStatusEnum *adStatus,
                                           struct _Connection *pConnection) {
+											  printf("%x\n",GetCurrentThreadId());
    *adStatus = adStatusUnwantedEvent;
    return S_OK;
 };
@@ -269,6 +270,7 @@ STDMETHODIMP CRstEvent::raw_MoveComplete( EventReasonEnum adReason,
                                           struct Error *pError,
                                           EventStatusEnum *adStatus,
                                           struct _Recordset *pRecordset) {
+											  printf("SSSSSSSSS");
    *adStatus = adStatusUnwantedEvent;
    return S_OK;
 };
@@ -413,17 +415,29 @@ int main() {
 
    if (FAILED(hr)) 
       return rc;
-
+   printf("%d thread id : %x\n", __LINE__,GetCurrentThreadId());
    // Do some work
-   pConn->Open("Provider=SQLOLEDB;Server=182.131.21.104;Database=alarm;User ID=alarm_user;Password=Huamaitel.com0822;Data Source=182.131.21.104,3199", "", "", adConnectUnspecified);
-   pRst->Open("SELECT * FROM authors", (IDispatch *) pConn, adOpenStatic, adLockReadOnly, adCmdText);
-
+   pConn->Open("Provider=SQLOLEDB;Server=182.131.21.104;Database=alarm;User ID=alarm_user;Password=Huamaitel.com0822;Data Source=182.131.21.104,3199", "", "", adAsyncConnect);
+    printf("%d thread id : %x\n", __LINE__,GetCurrentThreadId());
+	Sleep(1000);
+	try
+	{
+   pRst->Open("SELECT DeviceSN,DeviceName FROM HM_Host", (IDispatch *) pConn, adOpenStatic, adLockReadOnly, adCmdText|adAsyncExecute);
+	}
+	catch(_com_error& e)
+	{	
+		 printf("%d thread id : %x %s\n", __LINE__,GetCurrentThreadId(),(char*)e.Description());
+		
+	}
+Sleep(1000);
    pRst->MoveFirst();
+    printf("%d thread id : %x\n", __LINE__,GetCurrentThreadId());
    while (pRst->EndOfFile == FALSE) {
-      wprintf(L"Name = '%s'\n", (wchar_t*) ((_bstr_t) pRst->Fields->GetItem("au_lname")->Value));
+      wprintf(L"DeviceSN = '%s'\n", (wchar_t*) ((_bstr_t) pRst->Fields->GetItem("DeviceSN")->Value));
       pRst->MoveNext();
    }
 
+    printf("%d thread id : %x\n", __LINE__,GetCurrentThreadId());
    pRst->Close();
    pConn->Close();
 

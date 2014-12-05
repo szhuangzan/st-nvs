@@ -303,7 +303,7 @@ char* ServerHandler::read_auth_type_wrap(st_netfd_t fd)
 	// ¼øÈ¨£º
 
 	net_port_header_t hdr ={};
-	if (st_read(fd, &hdr, sizeof(net_port_header_t)-4, SEC2USEC(REQUEST_TIMEOUT)) < 0) {
+	if (st_read_fully(fd, &hdr, sizeof(net_port_header_t)-4, SEC2USEC(REQUEST_TIMEOUT)) < 0) {
 		st_netfd_close(fd);
 		return NULL;
 	}
@@ -313,7 +313,7 @@ char* ServerHandler::read_auth_type_wrap(st_netfd_t fd)
 	ptr = (char*)malloc(hdr.bodylen+1);
 	memset(ptr, 0, hdr.bodylen+1);
 	{
-		if (st_read(fd, ptr, hdr.bodylen, SEC2USEC(REQUEST_TIMEOUT)) < 0) {
+		if (st_read_fully(fd, ptr, hdr.bodylen, SEC2USEC(REQUEST_TIMEOUT)) < 0) {
 			st_netfd_close(fd);
 			return NULL;
 		}
@@ -359,7 +359,7 @@ char* ServerHandler::read_auth_type_wrap(st_netfd_t fd)
 		 if (cli_nfd == NULL) 
 		 {
 
-			 printf("%s:%d -> %d\n", __FUNCTION__,__LINE__, st_errno());
+			
 			 st_thread_create(handle_connections, (void *)srvfd, 0, 0);
 			 return NULL;
 

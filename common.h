@@ -71,9 +71,10 @@
 
 #include "md.h"
 
-#define ACCEPT_OPER 0
-#define SEND_OPER	1
-#define RECV_OPER   2
+#define ACCEPT_OPER		0
+#define CONNECT_OPER	1
+#define SEND_OPER		2
+#define RECV_OPER		3
 
 
 /*****************************************
@@ -240,6 +241,49 @@ typedef struct _st_netfd {
     struct _st_netfd *next;     /* For putting on the free list */
 } st_netfd_t;
 
+typedef struct _st_lock_free_queue_t
+{
+	volatile int write_cnt;
+	volatile int read_cnt;
+	volatile int length;
+	void**	 thread;
+}st_lock_free_queue_t;
+
+typedef struct _st_thread_cell_t
+{
+	
+	st_thread_t*	   thread;
+	struct _st_thread_cell_t*   next;
+
+}st_thread_cell_t;
+
+typedef struct _st_fifo_t
+{
+	int seq;
+	st_thread_cell_t* top;
+	
+}st_fifo_t;
+
+
+
+typedef struct _st_pointer_t
+{
+	struct _st_node_t* ptr;
+	LONG count;
+}st_pointer_t;
+
+
+typedef struct _st_node_t 
+{
+	st_thread_t* value;
+	struct _st_pointer_t next;
+}st_node_t;
+
+typedef struct _st_queue_t
+{
+	st_pointer_t head;
+	st_pointer_t tail;
+}st_queue_t;
 
 /*****************************************
  * Current vp and thread
@@ -394,6 +438,16 @@ st_stack_t *_st_stack_new(int stack_size);
 void _st_stack_free(st_stack_t *ts);
 int _st_io_init(void);
 int _st_wait(st_netfd_t* fd, st_utime_t timeout);
+
+
+ st_fifo_t *st_stack_alloc(void);
+ void st_stack_push(st_fifo_t *fp, st_thread_cell_t *cl);
+ st_thread_cell_t *st_stack_pop(st_fifo_t *fp);
+
+st_queue_t* _st_lock_free_queue_open();
+void _st_lock_free_queue_resize(st_lock_free_queue_t* queue);
+void _st_lock_free_enqueue(st_queue_t* queue, st_thread_t* thread);
+int _st_lock_free_dequeue(st_queue_t* queue, st_thread_t**);
 
 APIEXPORT st_utime_t st_utime(void);
 APIEXPORT st_cond_t *st_cond_new(void);

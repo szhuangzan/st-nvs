@@ -110,7 +110,7 @@ APIEXPORT st_netfd_t* st_netfd_listen(struct sockaddr_in addr);
 APIEXPORT int st_poll(struct pollfd *pds, int npds, st_utime_t timeout);
 APIEXPORT st_netfd_t st_accept(st_netfd_t fd, char* buf, int recv_len,
                             st_utime_t timeout);
-APIEXPORT int st_connect(st_netfd_t fd, struct sockaddr *addr, int addrlen,
+APIEXPORT st_netfd_t * st_connect(struct sockaddr_in addr, int addrlen,
                       st_utime_t timeout);
 APIEXPORT ssize_t st_read(st_netfd_t fd, void *buf, size_t nbyte,
                        st_utime_t timeout);
