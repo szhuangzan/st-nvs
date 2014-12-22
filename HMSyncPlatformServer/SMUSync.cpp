@@ -81,7 +81,7 @@ bool SMUSync::PacketWebService(st_netfd_t fd, const char* status_code, const std
 					->NewChild("Result", result[i].ErrCode.c_str())->GetParent()
 					->NewChild("Descr", result[i].Desc.c_str())->GetParent()
 					->NewChild("OPFlag",result[i].UserState.c_str())->GetParent()
-					->NewChild("ViewerName ",result[i].UserState.c_str())->GetParent();
+					->NewChild("ViewerName ",result[i].ViewName.c_str())->GetParent();
 				xml.GetParent();
 			}
 			body = xml.Encode();

@@ -258,23 +258,27 @@ void Server()
 	server.SetServerInfo(server_ip, server_port);
 
 	WriteToLog("Connect DB....");
-	if(server.InitDB(db_info))
-	{
-		WriteToLog("Connect DB Scuess");
-	}
-	else
-	{
+	if(!server.InitDB(db_info))
+	{	
+		brun = false;
 		WriteToLog("Connect DB Fail, Please Check Cfg");
+		return;
+		
 	}
 	
-	if(server.Run())
+	WriteToLog("Connect DB Scuess");
+
+	WriteToLog("begin server...");
+
+	if(!server.Run())
 	{
-		WriteToLog("begin server...");
-	}
-	else
-	{
+
+		brun = false;
 		WriteToLog("Server Run Fail, Please Check Cfg");
+		return;
 	}
+
+	WriteToLog("Server Run OK");
 
 	while(brun)
 	{

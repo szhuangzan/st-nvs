@@ -139,6 +139,7 @@ bool DatabaseSync::UpdateUserStateByDB(const SyncPlatformData& data, SyncPlatfor
 				std::string str(wstr.length(), ' ');
 				std::copy(wstr.begin(), wstr.end(), str.begin());
 				result.ViewName = str;
+				WriteToLog("ViewName  = %s", result.ViewName.c_str());
 			}
 		}
 
@@ -162,7 +163,7 @@ bool DatabaseSync::UpdateUserStateByDB(const SyncPlatformData& data, SyncPlatfor
 	if(ErrCode)
 	{
 		result.Desc = desc;
-		WriteToLog("UpdateUserStateByDB, ErrCode = %d, ErrDesc = %s", result.ErrCode, result.Desc.c_str())	;
+	//	WriteToLog("UpdateUserStateByDB, ErrCode = %d, ErrDesc = %s", result.ErrCode, result.Desc.c_str())	;
 	}
 	return !ErrCode;
 }
