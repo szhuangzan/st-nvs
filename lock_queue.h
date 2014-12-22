@@ -1,6 +1,7 @@
 // Copyright Idaho O Edokpayi 2008
 // Code is governed by Code Project Open License 
-
+#ifndef __LOCK_QUEUE__H__
+#define __LOCK_QUEUE__H__
 #include <exception>
 #include <windows.h>
 #include <algorithm>
@@ -187,11 +188,26 @@ public:
 	{
 		node_t* pNode = new node_t();
 		Head.ptr = Tail.ptr = pNode;
+		_notify_event = CreateEvent(NULL, true, false, NULL);
 	}
 	~st_msg_queue_t()
 	{
 		// remove the dummy head
+		CloseHandle(_notify_event);
 		delete Head.ptr;
+	}
+
+	void notify()
+	{
+
+		SetEvent(_notify_event);
+	}
+
+	DWORD wait(DWORD msc)
+	{
+		 DWORD flag = WaitForSingleObject(_notify_event, msc);
+		 ResetEvent(_notify_event);
+		 return flag;
 	}
 
 	// insert items of class T in the back of the queue
@@ -244,6 +260,7 @@ public:
 			} // endif
 
 		} // endloop
+
 	}
 
 	// remove items of class T from the front of the queue
@@ -306,4 +323,8 @@ public:
 		// queue was not empty, deque succeeded
 		return true;
 	}
+	private:
+		HANDLE    _notify_event;
 };
+
+#endif

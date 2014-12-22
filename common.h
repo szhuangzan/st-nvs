@@ -64,12 +64,14 @@
 #define NDEBUG
 #endif
 #include <assert.h>
+#include <vector>
 #define ST_ASSERT(expr) assert(expr)
 
 #define ST_BEGIN_MACRO  {
 #define ST_END_MACRO    }
 
 #include "md.h"
+#include "lock_queue.h"
 
 #define ACCEPT_OPER		0
 #define CONNECT_OPER	1
@@ -292,18 +294,33 @@ typedef struct _st_queue_t
 
 
 #import "C:\Program Files (x86)\Common Files\System\ado\msado15.dll" no_namespace rename("EOF", "EndOfFile")
+
+typedef struct _wrap_db_oper_t
+{
+	st_thread_t*	thread;
+
+	INT32			event;
+	char buf		[512];
+	std::wstring	sql;
+
+}wrap_db_oper_t;
+
 typedef struct _st_dbfd_t
 {
-	IConnectionPointContainer	*_pCPC;
-	IConnectionPoint			*_pCP;
-	IUnknown					*_pUnk;
-	//CRstEvent					*_pRstEvent;
-	//CConnEvent					*_pConnEvent;
-	_RecordsetPtr				_pRst; 
-	_ConnectionPtr				_pConn;
+	IConnectionPointContainer			*_pCPC;
+	IConnectionPoint					*_pCP;
+	IUnknown							*_pUnk;
+	_RecordsetPtr						_pRst; 
+	_ConnectionPtr						_pConn;
 
-	int							_oper_result;
-	char*						_connect_str;
+	char*								_connect_str;
+
+	std::vector<std::wstring>			_fetch_result;					
+
+	int									_err_code;
+	char								_err_desc[128];
+
+	st_msg_queue_t<wrap_db_oper_t*>*	_msg_queue;
 }st_dbfd_t;
 /*****************************************
  * Current vp and thread

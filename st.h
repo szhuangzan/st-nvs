@@ -44,7 +44,8 @@
 #include "neterr.h"
 #endif
 
-
+#include <vector>
+#include <string>
 
 
 #ifdef WIN32
@@ -133,8 +134,11 @@ APIEXPORT int st_errno(void);
 //DB
 
 #import "C:\Program Files (x86)\Common Files\System\ado\msado15.dll" no_namespace rename("EOF", "EndOfFile")
-APIEXPORT st_dbfd_t st_db_connect(const char* connect_str);
-APIEXPORT _RecordsetPtr st_db_query(st_dbfd_t dbfd, const char* sql);
+APIEXPORT st_dbfd_t st_db_connect(const char* connect_str, int* err_code, char* err_desc, int desc_len);
+APIEXPORT int st_db_query(st_dbfd_t dbfd, const char* sql,char* desc, int desc_len);
+APIEXPORT int  st_db_fetch(st_dbfd_t dbfd, const char* item, std::vector<std::wstring>& result, char* desc, int desc_len);
+APIEXPORT int  st_db_exec(st_dbfd_t dbfd, const char* sql, char* desc, int desc_len);
+APIEXPORT int st_db_close(st_dbfd_t dbfd);
 
 #endif /* !__ST_THREAD_H__ */
 

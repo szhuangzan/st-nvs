@@ -174,7 +174,7 @@ int _st_io_init(void)
 	//创建线程池
 	GetSystemInfo(&info);  
 
-	for(i=0; i<info.dwNumberOfProcessors*2; i++)
+	//for(i=0; i<info.dwNumberOfProcessors*2; i++)
 	{
 		HANDLE thread = CreateThread(NULL,0,(LPTHREAD_START_ROUTINE)_st_iocp_thread_pool, NULL, 0, NULL);
 		CloseHandle(thread);
@@ -238,22 +238,29 @@ static st_netfd_t *_st_netfd_new(int osfd, int nonblock, int is_socket)
 APIEXPORT st_netfd_t* st_netfd_listen(struct sockaddr_in addr)
 {
 	int n = 0;
+	int rc = 0;
 	st_netfd_t* fd;
 	st_per_handle_data* per_handle_data = NULL;
+
 	//创建一个监听套接字(进行重叠操作)
 	SOCKET Listen = WSASocket(AF_INET, SOCK_STREAM, 0, NULL, 0, WSA_FLAG_OVERLAPPED);
 	if (setsockopt(Listen, SOL_SOCKET, SO_REUSEADDR, (char *)&n, sizeof(n)) < 0)
 	{
-		assert(0);
+		return NULL;
 	}
+
 	//将监听套接字与完成端口绑定
-	fd = _st_netfd_new(Listen, 1, 1);
-	
+
 	per_handle_data = (st_per_handle_data*)GlobalAlloc(GPTR, sizeof(st_per_handle_data));
 	per_handle_data->socket = Listen;
 	CreateIoCompletionPort((HANDLE)Listen, _st_comletion_port, (ULONG_PTR)per_handle_data, 0);
-	bind(Listen, (PSOCKADDR)&addr, sizeof(addr));
-	listen(Listen, 10);
+	rc = bind(Listen, (PSOCKADDR)&addr, sizeof(addr));
+	if(rc != 0) return NULL;
+	
+	rc = listen(Listen, 10);
+	if(rc != 0) return NULL;
+	
+	fd = _st_netfd_new(Listen, 1, 1);
 	return fd;
 }
 
@@ -632,13 +639,13 @@ APIEXPORT ssize_t st_write(st_netfd_t* fd, const char *buf, size_t nbyte,st_utim
 
 	//调用AcceptEx函数，地址长度需要在原有的上面加上16个字节
 	//注意这里使用了重叠模型，该函数的完成将在与完成端口关联的工作线程中处理
-
 	rc = WSASend(fd->osfd, &(context->buffer), 1, &n, 0, &(context->overlapped), NULL);
 	if (rc != 0)
 	{
+	//	printf("%s:%d ->%d\n", __FUNCTION__, __LINE__, WSAGetLastError());
 		if (WSAGetLastError() != ERROR_IO_PENDING)
 		{
-			//  printf("%s:%d ->%d\n", __FUNCTION__, __LINE__, WSAGetLastError());
+			 
 			return -1;
 		}
 	}
@@ -676,11 +683,6 @@ APIEXPORT st_netfd_t *st_open(const char *path, int oflags, mode_t mode)
   int osfd, err;
   st_netfd_t *newfd;
 
-  while ((osfd = open(path, oflags, mode)) < 0) {
-    errno=_st_GetError(0);
-    if (errno != EINTR)
-      return NULL;
-  }
 
   newfd = _st_netfd_new(osfd, 0, 0);
   if (!newfd) {

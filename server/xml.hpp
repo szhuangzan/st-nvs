@@ -38,6 +38,7 @@ public:
 	void	Decode(char const*);
 
 	DMXml* FindElement(char const*name);
+	DMXml* FindAllElement(char const*name);
 	char*	GetValueText();
 	int		GetValueInt();
 	double   GetValueDouble();

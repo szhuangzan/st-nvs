@@ -13,19 +13,189 @@ static int count=0;
 
 #include <windows.h>
 extern int server(int argc, char *argv[]);
+
+
+
+#include<string>
+#include<windows.h>
+#include<vector>
+using namespace std;
+
+//utf8 转 Unicode
+
+
+std::wstring Utf82Unicode(const std::string& utf8string)
+{
+	int widesize = ::MultiByteToWideChar(CP_UTF8, 0, utf8string.c_str(), -1, NULL, 0);
+	if (widesize == ERROR_NO_UNICODE_TRANSLATION)
+	{
+		throw std::exception("Invalid UTF-8 sequence.");
+	}
+	if (widesize == 0)
+	{
+		throw std::exception("Error in conversion.");
+	}
+
+	std::vector<wchar_t> resultstring(widesize);
+
+	int convresult = ::MultiByteToWideChar(CP_UTF8, 0, utf8string.c_str(), -1, &resultstring[0], widesize);
+
+	if (convresult != widesize)
+	{
+		throw std::exception("La falla!");
+	}
+
+	return std::wstring(&resultstring[0]);
+}
+
+
+//unicode 转为 ascii
+
+
+std::string WideByte2Acsi(std::wstring& wstrcode)
+{
+	int asciisize = ::WideCharToMultiByte(CP_OEMCP, 0, wstrcode.c_str(), -1, NULL, 0, NULL, NULL);
+	if (asciisize == ERROR_NO_UNICODE_TRANSLATION)
+	{
+		throw std::exception("Invalid UTF-8 sequence.");
+	}
+	if (asciisize == 0)
+	{
+		throw std::exception("Error in conversion.");
+	}
+	std::vector<char> resultstring(asciisize);
+	int convresult =::WideCharToMultiByte(CP_OEMCP, 0, wstrcode.c_str(), -1, &resultstring[0], asciisize, NULL, NULL);
+
+	if (convresult != asciisize)
+	{
+		throw std::exception("La falla!");
+	}
+
+	return std::string(&resultstring[0]);
+}
+
+
+
+
+
+//utf-8 转 ascii
+
+
+std::string UTF_82ASCII(std::string& strUtf8Code)
+{
+	std::string strRet("");
+	//先把 utf8 转为 unicode
+	std::wstring wstr = Utf82Unicode(strUtf8Code);
+	//最后把 unicode 转为 ascii
+	strRet = WideByte2Acsi(wstr);
+	return strRet;
+}
+
+
+///////////////////////////////////////////////////////////////////////
+
+
+//ascii 转 Unicode
+
+
+std::wstring Acsi2WideByte(std::string& strascii)
+{
+	int widesize = MultiByteToWideChar (CP_ACP, 0, (char*)strascii.c_str(), -1, NULL, 0);
+	if (widesize == ERROR_NO_UNICODE_TRANSLATION)
+	{
+		throw std::exception("Invalid UTF-8 sequence.");
+	}
+	if (widesize == 0)
+	{
+		throw std::exception("Error in conversion.");
+	}
+	std::vector<wchar_t> resultstring(widesize);
+	int convresult = MultiByteToWideChar (CP_ACP, 0, (char*)strascii.c_str(), -1, &resultstring[0], widesize);
+
+
+	if (convresult != widesize)
+	{
+		throw std::exception("La falla!");
+	}
+
+	return std::wstring(&resultstring[0]);
+}
+
+
+//Unicode 转 Utf8
+
+
+std::string Unicode2Utf8(const std::wstring& widestring)
+{
+	int utf8size = ::WideCharToMultiByte(CP_UTF8, 0, widestring.c_str(), -1, NULL, 0, NULL, NULL);
+	if (utf8size == 0)
+	{
+		throw std::exception("Error in conversion.");
+	}
+
+	std::vector<char> resultstring(utf8size);
+
+	int convresult = ::WideCharToMultiByte(CP_UTF8, 0, widestring.c_str(), -1, &resultstring[0], utf8size, NULL, NULL);
+
+	if (convresult != utf8size)
+	{
+		throw std::exception("La falla!");
+	}
+
+	return std::string(&resultstring[0]);
+}
+
+
+//ascii 转 Utf8
+
+
+std::string ASCII2UTF_8(std::string& strAsciiCode)
+{
+	std::string strRet("");
+	//先把 ascii 转为 unicode
+	std::wstring wstr = Acsi2WideByte(strAsciiCode);
+	//最后把 unicode 转为 utf8
+	strRet = Unicode2Utf8(wstr);
+	return strRet;
+}
 void* handle_connect(void*arg)
 {
-	char buf[1024] = "Provider=SQLOLEDB;Server=182.131.21.104;Database=alarm;User ID=alarm_user;Password=Huamaitel.com0822;Data Source=182.131.21.104,3199";
-	st_dbfd_t dbfd = st_db_connect(buf);
+	char cc[1024] = "Provider=SQLOLEDB;Server=BGONG-B75DC97C7;Database=TestAlarm;User ID=sa;Password=147258abc;Data Source=192.168.10.186";
+	int errcode = 0;
+	char buf[128] = {};
+	st_dbfd_t dbfd = st_db_connect(cc, &errcode, buf, 128);
+	printf("ok\n");
+
+	/*	errcode = st_db_query(dbfd, "select UserName from HM_User;", buf, 128);
+		printf("ok\n");
+		if(errcode==0)
+		{
+			printf("ok\n");
+			std::vector<std::wstring> ss;
+			errcode = st_db_fetch(dbfd, "UserName",ss, buf,128);
+			if(errcode)printf("errr\n");
+			for(int i=0;i<ss.size();i++)
+			{
+				printf("%s\n",UnicodeToAscii(ss[i].c_str()));
+			}
+		}*/
+
+		{
+			std::string str="娴嬭瘯";
+				printf("%s\n",UnicodeToAscii(Utf8ToUnicode(str.c_str())));
+
+		}
 	
-	_RecordsetPtr pRst = st_db_query(dbfd, "SELECT DeviceSN,DeviceName FROM HM_Host");
+
 printf("ok\n");
 
-pRst->MoveFirst();
-printf("%d thread id : %x\n", __LINE__,GetCurrentThreadId());
-while (pRst->EndOfFile == FALSE) {
-	wprintf(L"DeviceSN = '%s'\n", (wchar_t*) ((_bstr_t) pRst->Fields->GetItem("DeviceSN")->Value));
-	pRst->MoveNext();
+{
+	
+	//if(st_db_exec(dbfd, "insert into [HM_User](UserID,AreaID,SerialNumber) values('11111','100001','11111')")!=0)
+	//{
+	//	printf("caozuo\n");
+	//}
+	st_db_close(dbfd);
 }
 	return NULL;
 }

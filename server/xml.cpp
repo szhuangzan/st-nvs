@@ -25,6 +25,7 @@ public:
 	void	DMXmlImpl_Decode(char const*);
 
 	TiXmlElement* DMXmlImpl_FindElement(TiXmlNode*node,char const*name);
+	TiXmlElement* DMXmlImpl_FindAllElement(TiXmlNode*node,char const*name);
 	char*	DMXmlImpl_GetValueText(TiXmlNode*node);
 	int		DMXmlImpl_GetValueInt(TiXmlNode*node);
 	double   DMXmlImpl_GetValueDouble(TiXmlNode*node);
@@ -111,6 +112,12 @@ void DMXmlImpl::DMXmlImpl_Decode(char const*context)
 TiXmlElement* DMXmlImpl::DMXmlImpl_FindElement(TiXmlNode*node, char const*name)
 {
 	return (TiXmlElement*)node->FirstChild(name);
+
+}
+
+TiXmlElement* DMXmlImpl::DMXmlImpl_FindAllElement(TiXmlNode*node, char const*name)
+{
+	return (TiXmlElement*)node->NextSibling(name);
 	
 }
 
@@ -222,6 +229,14 @@ double DMXmlImpl::DMXmlImpl_GetAttributeDouble(TiXmlNode*node, const char*name)
 		m_pnode = dynamic_cast<TiXmlNode*>(m_pxml->DMXmlImpl_FindElement(m_pnode,name));
 	return this;
  }
+
+ DMXml* DMXml::FindAllElement(char const*name)
+ {
+	 if(m_pnode)
+		 m_pnode = dynamic_cast<TiXmlNode*>(m_pxml->DMXmlImpl_FindAllElement(m_pnode,name));
+	 return this;
+ }
+
 
  char* DMXml::GetValueText()
  {

@@ -10,7 +10,7 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "server", "server\server.vcp
 		{A5DD2BD1-A329-4C7A-8E5D-55B956B217B9} = {A5DD2BD1-A329-4C7A-8E5D-55B956B217B9}
 	EndProjectSection
 EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "cpu", "cpu\cpu.vcproj", "{4C995907-218C-4EBC-8214-CD4A405FD19F}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "EncryCfg", "cpu\cpu.vcproj", "{4C995907-218C-4EBC-8214-CD4A405FD19F}"
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "database", "database\database.vcproj", "{EC14AD0D-2D6A-4714-BA4D-3D246ACD8123}"
 EndProject
@@ -18,6 +18,8 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "HMSyncPlatformServer", "..\
 	ProjectSection(ProjectDependencies) = postProject
 		{A5DD2BD1-A329-4C7A-8E5D-55B956B217B9} = {A5DD2BD1-A329-4C7A-8E5D-55B956B217B9}
 	EndProjectSection
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "HMSupervisonServer", "HMSupervisonServer\HMSupervisonServer.vcproj", "{C8BF12A4-1781-4A09-B2F0-A6C567941150}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -49,6 +51,10 @@ Global
 		{28C178EC-C710-4311-915A-D17C2100BAA7}.Debug|Win32.Build.0 = Debug|Win32
 		{28C178EC-C710-4311-915A-D17C2100BAA7}.Release|Win32.ActiveCfg = Release|Win32
 		{28C178EC-C710-4311-915A-D17C2100BAA7}.Release|Win32.Build.0 = Release|Win32
+		{C8BF12A4-1781-4A09-B2F0-A6C567941150}.Debug|Win32.ActiveCfg = Debug|Win32
+		{C8BF12A4-1781-4A09-B2F0-A6C567941150}.Debug|Win32.Build.0 = Debug|Win32
+		{C8BF12A4-1781-4A09-B2F0-A6C567941150}.Release|Win32.ActiveCfg = Release|Win32
+		{C8BF12A4-1781-4A09-B2F0-A6C567941150}.Release|Win32.Build.0 = Release|Win32
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
