@@ -41,7 +41,7 @@
 			<Tool
 				Name="VCCLCompilerTool"
 				Optimization="0"
-				AdditionalIncludeDirectories="F:\st"
+				AdditionalIncludeDirectories="C:\OpenSSL\include;F:\st"
 				PreprocessorDefinitions="WIN32;_DEBUG;_CONSOLE"
 				MinimalRebuild="true"
 				ExceptionHandling="0"
@@ -64,7 +64,7 @@
 				Name="VCLinkerTool"
 				AdditionalDependencies="st.lib"
 				LinkIncremental="2"
-				AdditionalLibraryDirectories="F:\lib"
+				AdditionalLibraryDirectories="C:\OpenSSL\lib;F:\lib"
 				GenerateDebugInformation="true"
 				SubSystem="1"
 				TargetMachine="1"
@@ -179,6 +179,10 @@
 				>
 			</File>
 			<File
+				RelativePath=".\ParseCfg.cpp"
+				>
+			</File>
+			<File
 				RelativePath=".\server.cpp"
 				>
 			</File>
@@ -225,6 +229,10 @@
 				>
 			</File>
 			<File
+				RelativePath=".\ParseCfg.h"
+				>
+			</File>
+			<File
 				RelativePath=".\SMUSync.h"
 				>
 			</File>
@@ -247,6 +255,10 @@
 			UniqueIdentifier="{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}"
 			>
 		</Filter>
+		<File
+			RelativePath=".\ClassDiagram1.cd"
+			>
+		</File>
 	</Files>
 	<Globals>
 	</Globals>

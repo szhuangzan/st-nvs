@@ -1,14 +1,12 @@
-#include "xml.hpp"
-#include "SMUSync.h"
-#include <WinSock2.h>
 
-extern "C"
-{
-#include "st.h"
-};
+#include "SMUSync.h"
+
+
 
 #define REQUEST_TIMEOUT 60
 #define SEC2USEC(s) ((s)*1000000LL)
+
+extern int WriteToLog(char* fmt, ...);
 
 SMUSync::SMUSync(void)
 {
@@ -18,148 +16,147 @@ SMUSync::~SMUSync(void)
 {
 }
 
-void SMUSync::SetPlatAddr(const char* url, const UINT16 port)
+
+bool SMUSync::ParseWebService(st_netfd_t fd, std::vector<SyncPlatformData>& data_vec)
 {
-	hostent* host = gethostbyname(url);
-	char buf[20] ={};
-	sprintf_s(buf, 20, "%d.%d.%d.%d",
-			host->h_addr_list[0][0]&0xff,
-			host->h_addr_list[0][1]&0xff,
-			host->h_addr_list[0][2]&0xff,
-			host->h_addr_list[0][3]&0xff);
-	_PlatIp = buf;
-	_PlatUrl = url;
-	_PlatPort = port;
-}
-
-void SMUSync::SetPlatAuthInfo(const char* UserName, const char* Password)
-{
-	_PlatUserName = UserName;
-	_PlatPassword = Password;
-}
-
-void SMUSync::SetPlatInfo(const char* PlatType, const char* PlatSofVer, const char* PlatHardVer)
-{
-	_PlatHardVer = PlatHardVer;
-	_PlatType = PlatType;
-	_PlatSoftVer = PlatSofVer;
-}
-
-void SMUSync::PacketWebService(const char* action, std::string& Body)
-{
-	char buf[20] = {};
-
-	_Sync_To_Msg.clear();
-
-	_Sync_To_Msg += "POST /Service/Clientex.asmx HTTP/1.1\r\n";
-
-	_Sync_To_Msg += "Host: ";
-	
-	_Sync_To_Msg += _PlatUrl;
-
-	_Sync_To_Msg += "\r\n";
-	_Sync_To_Msg += "Content-Type: text/xml; charset=utf-8\r\n";
-	_Sync_To_Msg += "Content-Length: ";
-
-	UINT32 strlen = Body.length();
-	sprintf_s(buf, sizeof(strlen), "%d", strlen);
-	_Sync_To_Msg += buf;
-	
-	_Sync_To_Msg += "\r\n";
-
-
-	_Sync_To_Msg += "SOAPAction: \"http://see1000.com/service/";
-
-	_Sync_To_Msg += action;
-	_Sync_To_Msg += "\"";
-	_Sync_To_Msg += "\r\n";
-	_Sync_To_Msg += "User-Agent: ";
-	_Sync_To_Msg += _PlatType;
-	_Sync_To_Msg += " ";
-	_Sync_To_Msg += _PlatHardVer;
-	_Sync_To_Msg += " ";
-	_Sync_To_Msg += _PlatSoftVer;
-	if(!_PlatCookie.empty())
-	{
-		_Sync_To_Msg += "\r\n";
-		_Sync_To_Msg += "Cookie: ";
-		_Sync_To_Msg += _PlatCookie;
-	}
-	_Sync_To_Msg += "\r\n";
-	_Sync_To_Msg += "\r\n";
-	_Sync_To_Msg += Body;
-}
-
-
-bool SMUSync::Login()
-{
-	DMXml xml;
-	bool exit = false;
 	std::string body;
-	char		RecvBuf[2048] = {};
-	UINT32      RecvLen = 0;
+	ReadInfo(fd, body);
+	if(body.empty())
+	{
+		return false;
+	}
 
 	{
-		sockaddr_in addrPeer ;  
-		ZeroMemory (&addrPeer , sizeof (sockaddr_in ));
-		addrPeer.sin_family = AF_INET ;
-		addrPeer.sin_addr .s_addr = inet_addr (_PlatIp.c_str());
-		addrPeer.sin_port = htons ( _PlatPort );
-		_srv_fd =  st_connect(addrPeer, sizeof(sockaddr_in),-1);
-		if(!_srv_fd)
+		DMXml xml;
+		xml.Decode(body.c_str());
+		xml.GetRoot();
+		if(!xml.CheckNodeValid())
 		{
+			WriteToLog("Xml Error");
 			return false;
+		}
+
+		{
+			SyncPlatformData data;
+			xml.GetRoot()->FindElement("SyncData");
+			if(!xml.CheckNodeValid())
+			{
+				WriteToLog("Xml Error");
+				return false;
+			}
+			if (ParseData(xml, data))
+			{
+				data_vec.push_back(data);
+			}
+		}
+
+		while(xml.FindAllElement("SyncData"))
+		{
+			SyncPlatformData data;
+			if (ParseData(xml, data))
+			{
+				data_vec.push_back(data);
+			}
+		}
+	}
+	return true;
+
+}
+
+bool SMUSync::PacketWebService(st_netfd_t fd, const char* status_code, const std::vector<SyncPlatformDataResult>& result)
+{
+
+	std::string body;
+	std::string head;
+	std::string msg;
+	{
+		if(result.size() != 0)
+		{
+			DMXml xml;
+			
+			xml.NewRoot("SyncResponseResult");
+			for(int i =0;i<result.size();i++)
+			{
+				xml.NewChild("SyncResult",0)->NewChild("StreamNo",result[i].SerialNumber.c_str())->GetParent()
+					->NewChild("Result", result[i].ErrCode.c_str())->GetParent()
+					->NewChild("Descr", result[i].Desc.c_str())->GetParent()
+					->NewChild("OPFlag",result[i].UserState.c_str())->GetParent()
+					->NewChild("ViewerName ",result[i].UserState.c_str())->GetParent();
+				xml.GetParent();
+			}
+			body = xml.Encode();
+		}
+		else
+		{
+			body = "<body>This is HMSyncPlatformServer, Is Running!</body>";
 		}
 	}
 
-	xml.NewRoot("soap:Envelope")
-		->SetTextAttribute("xmlns:soap", "http://www.w3.org/2003/05/soap-envelope")
-		->SetTextAttribute("xmlns:xsi", "http://www.w3.org/2001/XMLSchema-instance")
-		->SetTextAttribute("xmlns:xsd", "http://www.w3.org/2001/XMLSchema")
-		->SetTextAttribute("xmlns:soapenc", "http://schemas.xmlsoap.org/soap/encoding/")
-		->NewChild("soap:Body", 0)
-		->NewChild("Authenticate", 0)
-		->SetTextAttribute("xmlns","http://see1000.com/service")
-		->NewChild("name", _PlatUserName.c_str())->GetParent()
-		->NewChild("pass", _PlatPassword.c_str());
-	body = xml.Encode();
 
-	PacketWebService("Authenticate", body);
+	char body_len[10] = {};
+	sprintf_s(body_len, " %d\r\n",body.length());
 
-	if (!_srv_fd || st_write(_srv_fd, _Sync_To_Msg.c_str(), _Sync_To_Msg.length(),SEC2USEC(REQUEST_TIMEOUT))<0)
+	head = "HTTP/1.1 ";
+	head.append(status_code);
+	head.append("\r\n");
+	head.append("Server: HMSyncPlatformServer\r\n");
+	head.append("Content-Type: text/html\r\n");
+	head.append("Accept-Ranges: byte\r\n");
+	head.append("Connection: close\r\n");
+	head.append("Content-Length: ");
+	head.append(body_len);
+	head.append("\r\n");
+
+	msg.append(head);
+	msg.append(body);
+
+	st_write(fd, msg.c_str(), msg.length()+1, -1);
+	return true;
+}
+
+bool SMUSync::GetValueByName(std::string& msg, const char* name, std::string& value)
+{
+	int pos = msg.find(name);
+	if(pos == std::string::npos) return false;
+
 	{
-		exit = true;
-	}
+		std::string tmp1 = msg.substr(pos, msg.length()-pos);
+		int colon_pos = tmp1.find(":");
+		if(colon_pos == std::string::npos) return false;
+		int comma_pos = tmp1.find(":");
+		if(comma_pos == std::string::npos) return false;
 
-	if (!_srv_fd||(RecvLen = st_read(_srv_fd, RecvBuf, 2048, SEC2USEC(REQUEST_TIMEOUT)))<0)
-	{
-		printf("%s:%d\n",__FUNCTION__,__LINE__);
-		exit = true;
-	}
-
-	printf("recv buf = %s\n",RecvBuf);
-	{
-		std::string result = ParseWebService(RecvBuf, "AuthenticateResult");
-		if(result.compare("true"))
-		{
-			return false;
-		}
+		value = tmp1.substr(colon_pos, comma_pos-colon_pos-1);
 	}
 	return true;
 }
 
-std::string SMUSync::ParseWebService(const char* web, const char* compare_str)
+int SMUSync::ReadInfo(st_netfd_t fd, std::string& body)
 {
-	std::string WebInfo = web;
+
+	int total_len = 0;
+	int read_len = 0;
+	std::string WebInfo ;
+	{
+		char buf[2049] = {};
+		read_len = st_read(fd, buf, 2047, -1);
+		if(read_len < 0)
+		{
+			return false;
+		}
+
+		WebInfo.clear();
+		WebInfo = buf;
+	}
 
 	UINT32 headlen = 0;
 	UINT32 bodylen = 0;
-	INT32 pos = WebInfo.find("\r\n\r\n");
-	if(pos > 0)
+	INT32 body_pos = WebInfo.find("\r\n\r\n");
+	if(body_pos > 0)
 	{
-		std::string header = WebInfo.substr(0, pos);
+		std::string header = WebInfo.substr(0, body_pos);
 		headlen = header.size();
-		pos = header.find("Content-Length:");
+		int pos = header.find("Content-Length:");
 		if(pos > 0)
 		{
 			INT32 endpos = header.find("\r\n", pos);
@@ -169,51 +166,246 @@ std::string SMUSync::ParseWebService(const char* web, const char* compare_str)
 			std::string temp = contlen.substr(pos + 1, phrlen - pos - 1);
 			bodylen = atoi(temp.c_str());
 		}
+		else
+		{
+			return 0;
+		}
 		if(headlen > 0)
 		{
-			INT32 l = headlen + 2 + bodylen;
+			total_len = headlen  + bodylen+sizeof("\r\n\r\n")-1;
+		}
+		else
+		{
+			return 0;
 		}
 	}
-
+	else
 	{
-		INT32 pos = WebInfo.find("Cookie:");
-		INT32 endpos = WebInfo.find("\r\n", pos);
-		if(pos > 0)
-		{
-			INT32 sid_pos = WebInfo.find("ASP.NET_SessionId", pos);
-			if(sid_pos == WebInfo.npos) _PlatCookie = WebInfo.substr(pos + 7, endpos - pos - 7);
-		}
+		return 0;
 	}
 
-	if(WebInfo.size() > 10)
+
+	if(WebInfo.find("POST") == std::string::npos)
 	{
-		if(!WebInfo.substr(WebInfo.size() - 10, 10).compare(":Envelope>") ||
-			!WebInfo.substr(WebInfo.size() - 7, 7).compare("</html>"))
+		body = "";
+
+		return 0;
+	}
+
+	if(read_len < total_len)
+	{
+		char* buf = (char*)calloc(1, total_len-read_len);
+		int len = st_read_fully(fd, buf,total_len-read_len, -1);
+		read_len += len;
+		WebInfo.append(buf);
+		free(buf);
+	}
+	body = WebInfo.substr(body_pos+sizeof("\r\n\r\n")-1);
+	WriteToLog((char*)body.c_str());
+	return read_len;
+}
+
+bool SMUSync::ParseData(DMXml& xml, SyncPlatformData& data)
+{
+	bool flag = true;
+	do
+	{
 		{
+			char* tmp =  xml.FindElement("StreamNo")->GetValueText();
+			if(tmp)
+			{
+				data.SerialNumber  = tmp;
+				free(tmp);
+			}
+			if(!xml.CheckNodeValid())
+			{
+				WriteToLog("Xml Error");
+				flag = false;
+				break;
+			}
+		}
+
+
+
+		{
+			char* tmp = xml.GetParent()->FindElement("OPFlag")->GetValueText();
+			if(tmp)
+			{
+				data.CustState  = tmp;
+				free(tmp);
+			}
+			if(!xml.CheckNodeValid())
+			{
+				WriteToLog("Xml Error");
+				flag = false;
+				break;
+			}
+		}
+		{
+			char* tmp = xml.GetParent()->FindElement("CustID")->GetValueText();
+			if(tmp)
+			{
+				data.CustID  = tmp;
+				free(tmp);
+			}
+			if(!xml.CheckNodeValid())
+			{
+				WriteToLog("Xml Error");
+				flag = false;
+				break;
+			}
+		}
+
+		{
+			char* tmp = xml.GetParent()->FindElement("CustAccount")->GetValueText();
+			if(tmp)
+			{
+				data.CustAccunt   = tmp;
+				free(tmp);
+			}
+			if(!xml.CheckNodeValid())
+			{
+				WriteToLog("Xml Error");
+				flag = false;
+				break;;
+			}
+		}
 		
+		{
+			char* tmp = xml.GetParent()->FindElement("CustName")->GetValueText();
+			if(tmp)
+			{
+				std::wstring wstr;
+				wchar_t* unciode = Utf8ToUnicode(tmp);
+				char* ascii = UnicodeToAscii((char*)unciode);
+				data.CustName = ascii;
+				WriteToLog("%s\n", ascii);
+				free(ascii);
+				free(unciode);
+				free(tmp);
+			}
+			if(!xml.CheckNodeValid())
+			{
+				WriteToLog("Xml Error");
+				flag = false;
+				break;
+			}
 		}
-	}
 
+		{
+			char* tmp = xml.GetParent()->FindElement("InstalledAddress")->GetValueText();
+			if(tmp)
+			{
+				
+				wchar_t* unciode = Utf8ToUnicode(tmp);
+				char* ascii = UnicodeToAscii((char*)unciode);
+			
+				data.LinkAddr = ascii;
+				WriteToLog("%s\n", ascii);
+				free(ascii);
+				free(unciode);
+				free(tmp);
+			}
+			if(!xml.CheckNodeValid())
+			{
+				WriteToLog("Xml Error");
+				flag = false;
+				break;
+			}
+		}
+	}while(0);
+
+	xml.GetParent();
+	return flag;
+}
+
+bool SMUSync::LoginPlat(st_netfd_t fd, const PlatLoginInfo& plat)
+{
+	DMXml xml;
+	bool flag = true;
+	std::string msg;
+	char		RecvBuf[2048] = {};
+	UINT32      RecvLen = 0;
+
+	xml.NewRoot("soap:Envelope")
+		->SetTextAttribute("xmlns:soap", "http://www.w3.org/2003/05/soap-envelope")
+		->SetTextAttribute("xmlns:xsi", "http://www.w3.org/2001/XMLSchema-instance")
+		->SetTextAttribute("xmlns:xsd", "http://www.w3.org/2001/XMLSchema")
+		->SetTextAttribute("xmlns:soapenc", "http://schemas.xmlsoap.org/soap/encoding/")
+		->NewChild("soap:Body", 0)
+		->NewChild("Authenticate", 0)
+		->SetTextAttribute("xmlns","http://see1000.com/service")
+		->NewChild("name", plat.PlatUserName.c_str())->GetParent()
+		->NewChild("pass", plat.PlatPwd.c_str());
+	std::string body = xml.Encode();
+
+	//PacketPlatServer("Authenticate", body);
+
+	do 
 	{
-		std::string com = compare_str;
-		INT32 begpos = WebInfo.find(com);
-		if(begpos == std::string::npos)
+		if (st_write(fd, msg.c_str(), msg.length(),-1)<0)
 		{
-			return false;
-		}
-		begpos += strlen(compare_str)+1;
-
-		com.insert(0,1,'/');
-		INT32 endpos = WebInfo.find(com);
-		if(endpos == std::string::npos)
-		{
-			return "";
+			flag = true;
+			break;
 		}
 
-		endpos -= 1;
-		std::string result = WebInfo.substr(begpos, endpos-begpos);
-		printf("%s\n",result.c_str());
-		return result;
+		if (st_read(fd, RecvBuf, 2048, -1)<0)
+		{
+			flag = false;
+			break;
+		}
+
+	/*	{
+			std::string result = ParseWebService(RecvBuf, "AuthenticateResult");
+			if(result.compare("true"))
+			{
+				return false;
+			}
+		}*/
+
+	} while (0);
+
+	return flag;
+}
+
+
+bool SMUSync::SendUserStateToPlat(const std::string& user)
+{
+	return false;
+}
+
+
+
+wchar_t* SMUSync::Utf8ToUnicode(const char* utf)
+{
+	if(!utf || !strlen(utf))
+	{
+		return NULL;
 	}
+	int dwUnicodeLen = MultiByteToWideChar(CP_UTF8,0,utf,-1,NULL,0);
+	size_t num = dwUnicodeLen*sizeof(wchar_t);
+	wchar_t *pwText = (wchar_t*)malloc(num);
+	memset(pwText,0,num);
+	MultiByteToWideChar(CP_UTF8,0,utf,-1,pwText,dwUnicodeLen);
+	return pwText;
+}
 
+char* SMUSync::UnicodeToUtf8(const char* unicode)
+{
+	int len;
+	len = WideCharToMultiByte(CP_UTF8, 0, (const wchar_t*)unicode, -1, NULL, 0, NULL, NULL);
+	char *szUtf8 = (char*)malloc(len + 1);
+	memset(szUtf8, 0, len + 1);
+	WideCharToMultiByte(CP_UTF8, 0, (const wchar_t*)unicode, -1, szUtf8, len, NULL,NULL);
+	return szUtf8;
+}
+
+char* SMUSync::UnicodeToAscii(const char* unicode)
+{
+	int len;
+	len = WideCharToMultiByte(CP_OEMCP, 0, (const wchar_t*)unicode, -1, NULL, 0, NULL, NULL);
+	char *szUtf8 = (char*)malloc(len + 1);
+	memset(szUtf8, 0, len + 1);
+	WideCharToMultiByte(CP_OEMCP, 0, (const wchar_t*)unicode, -1, szUtf8, len, NULL,NULL);
+	return szUtf8;
 }

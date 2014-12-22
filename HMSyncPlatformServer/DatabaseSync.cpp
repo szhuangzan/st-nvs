@@ -1,525 +1,203 @@
 #include "DatabaseSync.h"
-
-#import "C:\Program Files (x86)\Common Files\System\ado\msado15.dll" no_namespace rename("EOF", "EndOfFile")
-// The Connection events
-class CConnEvent : public ConnectionEventsVt {
-private:
-	ULONG m_cRef;
-
-public:
-	CConnEvent() { m_cRef = 0; };
-	~CConnEvent() {};
-
-	STDMETHODIMP QueryInterface(REFIID riid, void ** ppv);
-	STDMETHODIMP_(ULONG) AddRef();
-	STDMETHODIMP_(ULONG) Release();
-
-	STDMETHODIMP raw_InfoMessage( struct Error *pError, 
-		EventStatusEnum *adStatus, 
-	struct _Connection *pConnection);
-
-	STDMETHODIMP raw_BeginTransComplete( LONG TransactionLevel,
-	struct Error *pError,
-		EventStatusEnum *adStatus,
-	struct _Connection *pConnection);
-
-	STDMETHODIMP raw_CommitTransComplete( struct Error *pError, 
-		EventStatusEnum *adStatus,
-	struct _Connection *pConnection);
-
-	STDMETHODIMP raw_RollbackTransComplete( struct Error *pError, 
-		EventStatusEnum *adStatus,
-	struct _Connection *pConnection);
-
-	STDMETHODIMP raw_WillExecute( BSTR *Source,
-		CursorTypeEnum *CursorType,
-		LockTypeEnum *LockType,
-		long *Options,
-		EventStatusEnum *adStatus,
-	struct _Command *pCommand,
-	struct _Recordset *pRecordset,
-	struct _Connection *pConnection);
-
-	STDMETHODIMP raw_ExecuteComplete( LONG RecordsAffected,
-	struct Error *pError,
-		EventStatusEnum *adStatus,
-	struct _Command *pCommand,
-	struct _Recordset *pRecordset,
-	struct _Connection *pConnection);
-
-	STDMETHODIMP raw_WillConnect( BSTR *ConnectionString,
-		BSTR *UserID,
-		BSTR *Password,
-		long *Options,
-		EventStatusEnum *adStatus,
-	struct _Connection *pConnection);
-
-	STDMETHODIMP raw_ConnectComplete( struct Error *pError,
-		EventStatusEnum *adStatus,
-	struct _Connection *pConnection);
-
-	STDMETHODIMP raw_Disconnect( EventStatusEnum *adStatus, struct _Connection *pConnection);
-};
-
-// The Recordset events
-class CRstEvent : public RecordsetEventsVt {
-private:
-	ULONG m_cRef;   
-
-public:
-	CRstEvent() { m_cRef = 0; };
-	~CRstEvent() {};
-
-	STDMETHODIMP QueryInterface(REFIID riid, void ** ppv);
-	STDMETHODIMP_(ULONG) AddRef();
-	STDMETHODIMP_(ULONG) Release();
-
-	STDMETHODIMP raw_WillChangeField( LONG cFields,      
-		VARIANT Fields,
-		EventStatusEnum *adStatus,
-	struct _Recordset *pRecordset);
-
-	STDMETHODIMP raw_FieldChangeComplete( LONG cFields,
-		VARIANT Fields,
-	struct Error *pError,
-		EventStatusEnum *adStatus,
-	struct _Recordset *pRecordset);
-
-	STDMETHODIMP raw_WillChangeRecord( EventReasonEnum adReason,
-		LONG cRecords,
-		EventStatusEnum *adStatus,
-	struct _Recordset *pRecordset);
-
-	STDMETHODIMP raw_RecordChangeComplete( EventReasonEnum adReason,
-		LONG cRecords,
-	struct Error *pError,
-		EventStatusEnum *adStatus,
-	struct _Recordset *pRecordset);
-
-	STDMETHODIMP raw_WillChangeRecordset( EventReasonEnum adReason,
-		EventStatusEnum *adStatus,
-	struct _Recordset *pRecordset);
-
-	STDMETHODIMP raw_RecordsetChangeComplete( EventReasonEnum adReason,
-	struct Error *pError,
-		EventStatusEnum *adStatus,
-	struct _Recordset *pRecordset);
-
-	STDMETHODIMP raw_WillMove( EventReasonEnum adReason,
-		EventStatusEnum *adStatus,
-	struct _Recordset *pRecordset);
-
-	STDMETHODIMP raw_MoveComplete( EventReasonEnum adReason,
-	struct Error *pError,
-		EventStatusEnum *adStatus,
-	struct _Recordset *pRecordset);
-
-	STDMETHODIMP raw_EndOfRecordset( VARIANT_BOOL *fMoreData,
-		EventStatusEnum *adStatus,
-	struct _Recordset *pRecordset);
-
-	STDMETHODIMP raw_FetchProgress( long Progress,
-		long MaxProgress,
-		EventStatusEnum *adStatus,
-	struct _Recordset *pRecordset);
-
-	STDMETHODIMP raw_FetchComplete( struct Error *pError, 
-		EventStatusEnum *adStatus,
-	struct _Recordset *pRecordset);
-};
-
-// Implement each connection method
-STDMETHODIMP CConnEvent::raw_InfoMessage( struct Error *pError, 
-										 EventStatusEnum *adStatus,
-struct _Connection *pConnection) {
-	*adStatus = adStatusUnwantedEvent;
-	return S_OK;
-};
-
-STDMETHODIMP CConnEvent::raw_BeginTransComplete( LONG TransactionLevel,
-struct Error *pError,
-	EventStatusEnum *adStatus,
-struct _Connection *pConnection) {
-	*adStatus = adStatusUnwantedEvent;
-	return S_OK;
-};
-
-STDMETHODIMP CConnEvent::raw_CommitTransComplete( struct Error *pError,
-												 EventStatusEnum *adStatus,
-struct _Connection *pConnection) {
-	*adStatus = adStatusUnwantedEvent;
-	return S_OK;
-};
-
-STDMETHODIMP CConnEvent::raw_RollbackTransComplete( struct Error *pError,
-												   EventStatusEnum *adStatus,
-struct _Connection *pConnection) {
-	*adStatus = adStatusUnwantedEvent;
-	return S_OK;
-};
-
-STDMETHODIMP CConnEvent::raw_WillExecute( BSTR *Source,
-										 CursorTypeEnum *CursorType,
-										 LockTypeEnum *LockType,
-										 long *Options,
-										 EventStatusEnum *adStatus,
-struct _Command *pCommand,
-struct _Recordset *pRecordset,
-struct _Connection *pConnection) {
-	*adStatus = adStatusUnwantedEvent;
-	return S_OK;
-};
-
-STDMETHODIMP CConnEvent::raw_ExecuteComplete( LONG RecordsAffected,
-struct Error *pError,
-	EventStatusEnum *adStatus,
-struct _Command *pCommand,
-struct _Recordset *pRecordset,
-struct _Connection *pConnection) {
-	*adStatus = adStatusUnwantedEvent;
-	return S_OK;
-};
-
-STDMETHODIMP CConnEvent::raw_WillConnect( BSTR *ConnectionString,
-										 BSTR *UserID,
-										 BSTR *Password,
-										 long *Options,
-										 EventStatusEnum *adStatus,
-struct _Connection *pConnection) {
-	printf("%d thread id : %x\n", __LINE__,GetCurrentThreadId());;
-	*adStatus = adStatusUnwantedEvent;
-	return S_OK;
-};
-
-STDMETHODIMP CConnEvent::raw_ConnectComplete( struct Error *pError,
-											 EventStatusEnum *adStatus,
-struct _Connection *pConnection) {
-	printf("%d thread id : %x\n", __LINE__,GetCurrentThreadId());
-	*adStatus = adStatusUnwantedEvent;
-	return S_OK;
-};
-
-STDMETHODIMP CConnEvent::raw_Disconnect( EventStatusEnum *adStatus, struct _Connection *pConnection) {
-	*adStatus = adStatusUnwantedEvent;
-	return S_OK;
-};
-
-// Implement each recordset method
-STDMETHODIMP CRstEvent::raw_WillChangeField( LONG cFields,
-											VARIANT Fields,
-											EventStatusEnum *adStatus,
-struct _Recordset *pRecordset) {
-	*adStatus = adStatusUnwantedEvent;
-	return S_OK;
-};
-
-STDMETHODIMP CRstEvent::raw_FieldChangeComplete( LONG cFields,
-												VARIANT Fields,
-struct Error *pError,
-	EventStatusEnum *adStatus,
-struct _Recordset *pRecordset) {
-	*adStatus = adStatusUnwantedEvent;
-	return S_OK;
-};
-
-STDMETHODIMP CRstEvent::raw_WillChangeRecord( EventReasonEnum adReason,
-											 LONG cRecords,
-											 EventStatusEnum *adStatus,
-struct _Recordset *pRecordset) {
-	*adStatus = adStatusUnwantedEvent;
-	return S_OK;
-};
-
-STDMETHODIMP CRstEvent::raw_RecordChangeComplete( EventReasonEnum adReason,
-												 LONG cRecords,
-struct Error *pError,
-	EventStatusEnum *adStatus,
-struct _Recordset *pRecordset) {
-	*adStatus = adStatusUnwantedEvent;
-	return S_OK;
-};
-
-STDMETHODIMP CRstEvent::raw_WillChangeRecordset( EventReasonEnum adReason,
-												EventStatusEnum *adStatus,
-struct _Recordset *pRecordset) {
-	*adStatus = adStatusUnwantedEvent;
-	return S_OK;
-};
-
-STDMETHODIMP CRstEvent::raw_RecordsetChangeComplete( EventReasonEnum adReason,
-struct Error *pError,
-	EventStatusEnum *adStatus,
-struct _Recordset *pRecordset) {
-	printf("%d thread id : %x\n", __LINE__,GetCurrentThreadId());
-	*adStatus = adStatusUnwantedEvent;
-	return S_OK;
-};
-
-STDMETHODIMP CRstEvent::raw_WillMove( EventReasonEnum adReason, 
-									 EventStatusEnum *adStatus,
-struct _Recordset *pRecordset) {
-	*adStatus = adStatusUnwantedEvent;
-	return S_OK;
-};
-
-STDMETHODIMP CRstEvent::raw_MoveComplete( EventReasonEnum adReason,
-struct Error *pError,
-	EventStatusEnum *adStatus,
-struct _Recordset *pRecordset) {
-	printf("%d thread id : %x\n", __LINE__,GetCurrentThreadId());
-	*adStatus = adStatusUnwantedEvent;
-	return S_OK;
-};
-
-STDMETHODIMP CRstEvent::raw_EndOfRecordset( VARIANT_BOOL *fMoreData,
-										   EventStatusEnum *adStatus,
-struct _Recordset *pRecordset) {
-	printf("%d thread id : %x\n", __LINE__,GetCurrentThreadId());
-	*adStatus = adStatusUnwantedEvent;
-	return S_OK;
-};
-
-STDMETHODIMP CRstEvent::raw_FetchProgress( long Progress,
-										  long MaxProgress,
-										  EventStatusEnum *adStatus,
-struct _Recordset *pRecordset) {
-	*adStatus = adStatusUnwantedEvent;
-	return S_OK;
-};
-
-STDMETHODIMP CRstEvent::raw_FetchComplete( struct Error *pError,
-										  EventStatusEnum *adStatus,
-struct _Recordset *pRecordset) {
-	*adStatus = adStatusUnwantedEvent;
-	return S_OK;
-};
-
-STDMETHODIMP CRstEvent::QueryInterface(REFIID riid, void ** ppv) {
-	*ppv = NULL;
-	if (riid == __uuidof(IUnknown) || riid == __uuidof(RecordsetEventsVt)) 
-		*ppv = this;
-
-	if (*ppv == NULL)
-		return ResultFromScode(E_NOINTERFACE);
-
-	AddRef();
-	return NOERROR;
-}
-
-STDMETHODIMP_(ULONG) CRstEvent::AddRef() { 
-	return ++m_cRef; 
-};
-
-STDMETHODIMP_(ULONG) CRstEvent::Release() { 
-	if (0 != --m_cRef) 
-		return m_cRef;
-	delete this;
-	return 0;
-}
-
-STDMETHODIMP CConnEvent::QueryInterface(REFIID riid, void ** ppv) {
-	*ppv = NULL;
-	if (riid == __uuidof(IUnknown) || riid == __uuidof(ConnectionEventsVt)) 
-		*ppv = this;
-
-	if (*ppv == NULL)
-		return ResultFromScode(E_NOINTERFACE);
-
-	AddRef();
-	return NOERROR;
-}
-
-STDMETHODIMP_(ULONG) CConnEvent::AddRef() { 
-	return ++m_cRef; 
-};
-
-STDMETHODIMP_(ULONG) CConnEvent::Release() { 
-	if (0 != --m_cRef) 
-		return m_cRef;
-	delete this;
-	return 0;
-}
-
-
-///
-
-DatabaseSync::DatabaseSync(void)
-:_pCPC(NULL),
-	_pCP(NULL),
-	_pUnk(NULL),
-	_pRstEvent(NULL),
-	_pConnEvent(NULL)
-
-{
-}
-
-DatabaseSync::~DatabaseSync(void)
-{
-}
-
-
-int DatabaseSync::Init()
-{
-	HRESULT hr;
-	int rc = 0;
-
-	::CoInitialize(NULL);
-
-	hr = _pConn.CreateInstance(__uuidof(Connection));
-
-	if (FAILED(hr)) 
-		return rc;
-
-	hr = _pRst.CreateInstance(__uuidof(Recordset));
-
-	if (FAILED(hr)) 
-		return rc;
-
-	// Start using the Connection events
-	hr = _pConn->QueryInterface(__uuidof(IConnectionPointContainer), (void **)&_pCPC);
-
-	if (FAILED(hr)) 
-		return rc;
-
-	hr = _pCPC->FindConnectionPoint(__uuidof(ConnectionEvents), &_pCP);
-	_pCPC->Release();
-
-	if (FAILED(hr)) 
-		return rc;
-
-	_pConnEvent = new CConnEvent();
-	hr = _pConnEvent->QueryInterface(__uuidof(IUnknown), (void **) &_pUnk);
-
-	if (FAILED(hr)) 
-		return rc;
-
-	hr = _pCP->Advise(_pUnk, &_dwConnEvt);
-	_pCP->Release();
-
-	if (FAILED(hr)) 
-		return rc;
-
-	// Start using the Recordset events
-	hr = _pRst->QueryInterface(__uuidof(IConnectionPointContainer), (void **)&_pCPC);
-
-	if (FAILED(hr)) 
-		return rc;
-
-	hr = _pCPC->FindConnectionPoint(__uuidof(RecordsetEvents), &_pCP);
-	_pCPC->Release();
-
-	if (FAILED(hr)) 
-		return rc;
-
-	_pRstEvent = new CRstEvent();
-	hr = _pRstEvent->QueryInterface(__uuidof(IUnknown), (void **) &_pUnk);
-
-	if (FAILED(hr)) 
-		return rc;
-
-	hr = _pCP->Advise(_pUnk, &_dwRstEvt);
-	_pCP->Release();
-
-	if (FAILED(hr)) 
-		return rc;
-	return rc;
-}
-
-int DatabaseSync::UnInit()
-{
-	HRESULT hr = 0;
-	int rc = 0;
-	_pRst->Close();
-	_pConn->Close();
-
-	// Stop using the Connection events
-	hr = _pConn->QueryInterface(__uuidof(IConnectionPointContainer), (void **) &_pCPC);
-
-	if (FAILED(hr)) 
-		return rc;
-
-	hr = _pCPC->FindConnectionPoint(__uuidof(ConnectionEvents), &_pCP);
-	_pCPC->Release();
-
-	if (FAILED(hr)) 
-		return rc;
-
-	hr = _pCP->Unadvise(_dwConnEvt );
-	_pCP->Release();
-
-	if (FAILED(hr)) 
-		return rc;
-
-	// Stop using the Recordset events
-	hr = _pRst->QueryInterface(__uuidof(IConnectionPointContainer), (void **) &_pCPC);
-
-	if (FAILED(hr)) 
-		return rc;
-
-	hr = _pCPC->FindConnectionPoint(__uuidof(RecordsetEvents), &_pCP);
-	_pCPC->Release();
-
-	if (FAILED(hr)) 
-		return rc;
-
-	hr = _pCP->Unadvise(_dwRstEvt );
-	_pCP->Release();
-
-	if (FAILED(hr)) 
-		return rc;
-
-	CoUninitialize();
-	return rc;
-}
-
-void DatabaseSync::SetDBConnectInfo(const DBConnectInfo_t&)
+#include <string>
+extern int WriteToLog(char* str,...);
+DatabaseSync::DatabaseSync()
+:_dbfd(0)
 {
 
 }
 
+DatabaseSync::~DatabaseSync()
+{
+
+}
+
+void DatabaseSync::SetDBConnectInfo(const DBConnectInfo_t& info)
+{
+	memset(_connect_str,0,sizeof(_connect_str));
+	if(info._server_port == 1433)
+	{
+		sprintf_s(_connect_str, 1024, "Provider=SQLOLEDB;Server=%s;Database=%s;User ID=%s;Password=%s;Data Source=%s",
+			info._server.c_str(),
+			info._database_name.c_str(),
+			info._dbms_user_name.c_str(),
+			info._dbms_user_pwd.c_str(),
+			info._server_ip.c_str()
+			);
+	}
+	else
+	{
+		sprintf_s(_connect_str, 1024, "Provider=SQLOLEDB;Server=%s;Database=%s;User ID=%s;Password=%s;Data Source=%s,%d",
+			info._server.c_str(),
+			info._database_name.c_str(),
+			info._dbms_user_name.c_str(),
+			info._dbms_user_pwd.c_str(),
+			info._server_ip.c_str(),
+			info._server_port
+			);
+	}
+
+}
 
 bool DatabaseSync::Connect()
 {
 	bool flag = true;
-	char buf[1024] = {};
-	sprintf_s(buf, "Provider=SQLOLEDB;Server=%s;Database=%s;User ID=%s;Password=%s;Data Source=%s,%d",
-					_db_connect_info._server_ip,
-					_db_connect_info._database_name,
-					_db_connect_info._dbms_user_name,
-					_db_connect_info._dbms_user_pwd,
-					_db_connect_info._server_ip,
-					_db_connect_info._server_port);
-
-	try
+	int err_code = 0;
+	char buf[128] = {};
+	_dbfd = 0;
+	_dbfd = st_db_connect(_connect_str, &err_code, buf, sizeof(buf));
+	if(err_code != 0)
 	{
-		_pConn->Open(buf, "","", adConnectUnspecified);
+		WriteToLog("DB Connect Error = %x, ErrDesc = %s", err_code, buf);
 	}
-	catch(_com_error& err)
-	{
-		printf("%s:%d -> %s\n",__FUNCTION__,__LINE__,(char*)err.Description());
-		flag = false;
-	}
-	
+	if(!_dbfd) flag = false;
 	return flag;
 }
 
-bool DatabaseSync::ReadDBSyncSerialNo()
+
+bool DatabaseSync::CreateUserByDB(const SyncPlatformData& data, SyncPlatformDataResult& result)
+{
+	bool		flag = true;
+	char		sql[512] = {};
+	char create_user_time[20] = {};
+	{
+		time_t cur_time = st_time();
+		struct tm cur_tm ={};
+		localtime_s(&cur_tm, &cur_time);
+		sprintf_s(create_user_time, 20, "%04d-%02d-%02d",cur_tm.tm_year+1900, cur_tm.tm_mon+1, cur_tm.tm_mday);
+
+		sprintf_s(sql,512, "insert into [HM_User](UserID,AreaID,Address, UserName, CreateUserTime, SerialNumber, UserState) values('%s','%s','%s','%s','%s','%s','%s')", 
+					data.CustID.c_str(),
+					"root",
+					data.LinkAddr.c_str(),
+					data.CustName.c_str(),
+					create_user_time,
+					data.SerialNumber.c_str(),
+					data.CustState.c_str());
+	}
+
+	{
+		char desc[128] = {};
+		int ErrCode = 0;
+		if(_dbfd)
+		{
+			if((ErrCode = st_db_exec(_dbfd, sql, desc, sizeof(desc)))!=0)
+			{
+				result.Desc = desc;
+				if(ErrCode == 0x80040e2f){
+					result.ErrCode = "1";
+				}
+				else{
+					result.ErrCode = "2";
+				}
+				
+				flag  = false;
+				WriteToLog("Create User, ErrCode = %x, ErrDesc = %s", ErrCode, result.Desc.c_str())	;
+			}
+		}
+		else
+		{
+			result.Desc = "DB Error";
+			result.ErrCode = "2";
+		}
+
+	}
+
+	return flag;
+}
+
+bool DatabaseSync::UpdateUserStateByDB(const SyncPlatformData& data, SyncPlatformDataResult& result)
+{
+
+	char desc[128] = {};
+	int ErrCode = 0;
+	do 
+	{
+
+		{
+			char sql[1024] = {};
+			sprintf_s(sql, "select PlatLoginName from HM_User  where UserID='%s'", 
+				data.CustID.c_str());
+			ErrCode = st_db_query(_dbfd, sql, desc, sizeof(desc));
+			if(ErrCode)
+			{
+				WriteToLog("Update User, ErrCode = %x, ErrDesc = %s", ErrCode, result.Desc.c_str())	;
+				result.ErrCode = "3";
+				break;
+			}
+
+			std::vector<std::wstring> platLogin;
+			ErrCode = st_db_fetch(_dbfd, "PlatLoginName", platLogin, desc, sizeof(desc));
+			if(ErrCode)
+			{
+				result.ErrCode = "3";
+				break;
+			}
+			if(platLogin.size()==1)
+			{
+				const std::wstring& wstr = platLogin[0];
+				std::string str(wstr.length(), ' ');
+				std::copy(wstr.begin(), wstr.end(), str.begin());
+				result.ViewName = str;
+			}
+		}
+
+		{
+			char sql[1024] = {};
+			sprintf_s(sql, "update HM_User set UserState = '%s' where UserID='%s'", 
+				data.CustState.c_str(),
+				data.CustID.c_str());
+
+			if((ErrCode = st_db_exec(_dbfd, sql, desc, sizeof(desc)))!=0)
+			{
+				WriteToLog("Update User State, ErrCode = %x, ErrDesc = %s", ErrCode, result.Desc.c_str())	;
+				result.ErrCode = "3";
+				break;
+			}
+		
+		}
+
+	} while (0);
+
+	if(ErrCode)
+	{
+		result.Desc = desc;
+		WriteToLog("UpdateUserStateByDB, ErrCode = %d, ErrDesc = %s", result.ErrCode, result.Desc.c_str())	;
+	}
+	return !ErrCode;
+}
+
+
+bool DatabaseSync::UpdateUserByDB(const SyncPlatformData& data, SyncPlatformDataResult& result)
 {
 	bool flag = true;
+	char sql[1024] = {};
 
+	{
+		sprintf_s(sql, "update HM_User set UserName= '%s' where UserID='%s'", 
+			data.CustName.c_str(),
+			data.CustID.c_str());
+	}
+
+	{
+		char desc[128] = {};
+		int ErrCode = 0;
+		if((ErrCode = st_db_exec(_dbfd, sql, desc, sizeof(desc)))!=0)
+		{
+			result.ErrCode = "3";
+			result.Desc = desc;
+			flag  = false;
+			WriteToLog("Update User, ErrCode = %d, ErrDesc = %s", result.ErrCode, result.Desc.c_str())	;
+		}
+	}
 	return flag;
 }
 
-bool DatabaseSync::WriteDBSyncNoUpdateSerialNo(std::string msg)
-{
-	bool flag = true;
-
-	return flag;
-}
 
 bool DatabaseSync::DisConnect()
 {
 	bool flag = true;
-
+	st_db_close(_dbfd);
+	_dbfd = 0;
 	return flag;
 }

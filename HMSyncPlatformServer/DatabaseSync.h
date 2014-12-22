@@ -1,15 +1,15 @@
 #pragma once
 #include<string>
-#include <OCIdl.h>
-#import "C:\Program Files (x86)\Common Files\System\ado\msado15.dll" no_namespace rename("EOF", "EndOfFile")
-
+#include "st.h"
+#include "SMUSync.h"
 typedef struct _DBConnectInfo_t
 {
-	std::string		_server_ip;
-	std::string		_database_name;
-	std::string		_dbms_user_name;
-	std::string		_dbms_user_pwd;
-	UINT16			_server_port;
+	std::string				_server;
+	std::string				_server_ip;
+	std::string				_database_name;
+	std::string				_dbms_user_name;
+	std::string				_dbms_user_pwd;
+	unsigned short			_server_port;
 	_DBConnectInfo_t()
 	{
 
@@ -27,25 +27,17 @@ public:
 	~DatabaseSync(void);
 	
 public:
-	int Init();
-	int UnInit();
 	void SetDBConnectInfo(const DBConnectInfo_t&);
 	bool Connect();
 	bool ReadDBSyncSerialNo();
-	bool WriteDBSyncNoUpdateSerialNo(std::string msg);	
+	bool CreateUserByDB(const SyncPlatformData&, SyncPlatformDataResult& result);
+	bool UpdateUserStateByDB(const SyncPlatformData& data, SyncPlatformDataResult& resul);
+	bool UpdateUserByDB(const SyncPlatformData& data, SyncPlatformDataResult& resul);
 	bool DisConnect();
 private:
 	bool CheckState();
 private:
-	DBConnectInfo_t	  _db_connect_info;
+	char	          _connect_str[2014];
+	st_dbfd_t		  _dbfd;
 
-	IConnectionPointContainer	*_pCPC;
-	IConnectionPoint			*_pCP;
-	IUnknown					*_pUnk;
-	CRstEvent					*_pRstEvent;
-	CConnEvent					*_pConnEvent;
-	_RecordsetPtr				_pRst; 
-	_ConnectionPtr				_pConn;
-	DWORD						_dwConnEvt;
-	DWORD						_dwRstEvt;
 };

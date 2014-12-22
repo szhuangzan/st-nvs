@@ -19,12 +19,15 @@ public:
 	void		DMXmlImpl_SetAttribute(TiXmlNode*node, char const*name, char const*attr);
 	void		DMXmlImpl_SetAttribute(TiXmlNode*node, char const*name,int attr) ;
 	void		DMXmlImpl_SetAttribute(TiXmlNode*node, char const*name,double attr);
+	void        DMXmlImpl_SetIntValue(TiXmlNode*node, int value);
+	
 	char*		DMXmlImpl_Encode();
 	//½âÎöxml
 
-	void	DMXmlImpl_Decode(char const*);
+	const char*	DMXmlImpl_Decode(char const*);
 
 	TiXmlElement* DMXmlImpl_FindElement(TiXmlNode*node,char const*name);
+	TiXmlElement* DMXmlImpl_FindAllElement(TiXmlNode*node,char const*name);
 	char*	DMXmlImpl_GetValueText(TiXmlNode*node);
 	int		DMXmlImpl_GetValueInt(TiXmlNode*node);
 	double   DMXmlImpl_GetValueDouble(TiXmlNode*node);
@@ -71,6 +74,14 @@ void DMXmlImpl::DMXmlImpl_SetAttribute(TiXmlNode*node, char const*name, char con
 	ele->SetAttribute(name,attr);
 }
 
+void DMXmlImpl::DMXmlImpl_SetIntValue(TiXmlNode*node, int value)
+{
+	TiXmlElement* ele = dynamic_cast<TiXmlElement*>(node);
+	char buf[10] = {};
+	itoa(value, buf, 10);
+	ele->SetValue(buf);
+}
+
 void DMXmlImpl::DMXmlImpl_SetAttribute(TiXmlNode*node, char const*name,int attr)
 {
 	TiXmlElement* ele = dynamic_cast<TiXmlElement*>(node);
@@ -102,15 +113,21 @@ char*DMXmlImpl::DMXmlImpl_Encode()
 	return strdup(printer.CStr());
 }
 
-void DMXmlImpl::DMXmlImpl_Decode(char const*context)
+const char* DMXmlImpl::DMXmlImpl_Decode(char const*context)
 {
 	m_Doc->Clear();
-	m_Doc->Parse(context);
+	return m_Doc->Parse(context);
 }
 
 TiXmlElement* DMXmlImpl::DMXmlImpl_FindElement(TiXmlNode*node, char const*name)
 {
 	return (TiXmlElement*)node->FirstChild(name);
+
+}
+
+TiXmlElement* DMXmlImpl::DMXmlImpl_FindAllElement(TiXmlNode*node, char const*name)
+{
+	return (TiXmlElement*)node->NextSibling(name);
 	
 }
 
@@ -182,9 +199,22 @@ double DMXmlImpl::DMXmlImpl_GetAttributeDouble(TiXmlNode*node, const char*name)
 	 return this;
  }
 
+ bool DMXml::CheckNodeValid()
+ {
+	 return m_pnode!=NULL;
+ }
+
  DMXml* DMXml::GetParent()
  {
-	m_pnode = m_pxml->DMXmlImpl_GetParent(m_pnode);
+	 if(m_pnode)
+	 {
+		m_pnode = m_pxml->DMXmlImpl_GetParent(m_pnode);
+	 }
+	 else
+	 {
+		m_pnode = m_pxml->DMXmlImpl_GetParent(m_pre_pnode);
+	 }
+	
 	return this;
  }
 
@@ -206,22 +236,45 @@ double DMXmlImpl::DMXmlImpl_GetAttributeDouble(TiXmlNode*node, const char*name)
 	 return this;
  }
 
+ DMXml* DMXml::SetIntValue(int value)
+ {
+	 m_pxml->DMXmlImpl_SetIntValue(m_pnode, value);
+	 return this;
+ }
+
+
  char* DMXml::Encode()
  {
 	return m_pxml->DMXmlImpl_Encode();
  }
+ 
 
- void DMXml::Decode(const char *xml)
+const char* DMXml::Decode(const char *xml)
  {
-	 m_pxml->DMXmlImpl_Decode(xml);
+	 return  m_pxml->DMXmlImpl_Decode(xml);
  }
 
  DMXml* DMXml::FindElement(char const*name)
  {
 	 if(m_pnode)
+	 {
 		m_pnode = dynamic_cast<TiXmlNode*>(m_pxml->DMXmlImpl_FindElement(m_pnode,name));
+		if(m_pnode)
+		{
+			m_pre_pnode = m_pnode;
+		}
+	 }
 	return this;
  }
+
+bool DMXml::FindAllElement(char const*name)
+ {
+	 if(m_pnode)
+		 m_pnode = dynamic_cast<TiXmlNode*>(m_pxml->DMXmlImpl_FindAllElement(m_pnode,name));
+	if(m_pnode) return true;
+	return false;
+ }
+
 
  char* DMXml::GetValueText()
  {
