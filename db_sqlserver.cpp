@@ -278,7 +278,6 @@ DWORD WINAPI db_server(LPVOID param)
 			else if(oper && oper->event == DB_FETCH)
 			{
 				sqlServerDB.Fetch(oper->buf);
-				exit = true;
 			}
 			else if(oper && oper->event == DB_EXEC)
 			{
