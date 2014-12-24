@@ -78,7 +78,7 @@ int main(int argc, char* argv[])
 		fseek(src_cfg, 0, SEEK_SET);
 		char* src_data = (char*)calloc(1, file_len);
 		int read_len = fread(src_data, 1, file_len, src_cfg);
-		if(read_len != file_len)
+		if(read_len > file_len)
 		{
 			free(src_data);
 			fclose(src_cfg);

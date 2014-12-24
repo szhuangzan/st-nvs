@@ -180,14 +180,7 @@ void* handle_connect(void*arg)
 			}
 		}*/
 
-		{
-			std::string str="测试";
-				printf("%s\n",UnicodeToAscii(Utf8ToUnicode(str.c_str())));
-
-		}
-	
-
-printf("ok\n");
+		printf("ok\n");
 
 {
 	
@@ -202,9 +195,9 @@ printf("ok\n");
 int main(int argc, char *argv[])
 {
 
-	st_init();
-	st_thread_create(handle_connect, 0,0,0);
-	st_sleep(10000);
+	//st_init();
+	//st_thread_create(handle_connect, 0,0,0);
+	//st_sleep(10000);
 	/*st_netfd_t srvfd = NULL;
 	int n = 0;
 	struct sockaddr_in serv_addr;

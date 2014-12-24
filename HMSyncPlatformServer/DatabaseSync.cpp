@@ -48,7 +48,7 @@ bool DatabaseSync::Connect()
 	_dbfd = st_db_connect(_connect_str, &err_code, buf, sizeof(buf));
 	if(err_code != 0)
 	{
-		WriteToLog("DB Connect Error = %x, ErrDesc = %s", err_code, buf);
+		WriteToLog("%s, DB Connect Error = %x, ErrDesc = %s", _connect_str, err_code, buf);
 	}
 	if(!_dbfd) flag = false;
 	return flag;
@@ -67,7 +67,7 @@ bool DatabaseSync::CreateUserByDB(const SyncPlatformData& data, SyncPlatformData
 		sprintf_s(create_user_time, 20, "%04d-%02d-%02d",cur_tm.tm_year+1900, cur_tm.tm_mon+1, cur_tm.tm_mday);
 
 		sprintf_s(sql,512, "insert into [HM_User](UserID,AreaID,Address, UserName, CreateUserTime, SerialNumber, UserState) values('%s','%s','%s','%s','%s','%s','%s')", 
-					data.CustID.c_str(),
+					data.CustAccunt.c_str(),
 					"root",
 					data.LinkAddr.c_str(),
 					data.CustName.c_str(),
@@ -117,7 +117,7 @@ bool DatabaseSync::UpdateUserStateByDB(const SyncPlatformData& data, SyncPlatfor
 		{
 			char sql[1024] = {};
 			sprintf_s(sql, "select PlatLoginName from HM_User  where UserID='%s'", 
-				data.CustID.c_str());
+				data.CustAccunt.c_str());
 			ErrCode = st_db_query(_dbfd, sql, desc, sizeof(desc));
 			if(ErrCode)
 			{
@@ -141,13 +141,19 @@ bool DatabaseSync::UpdateUserStateByDB(const SyncPlatformData& data, SyncPlatfor
 				result.ViewName = str;
 				WriteToLog("ViewName  = %s", result.ViewName.c_str());
 			}
+			else
+			{
+				WriteToLog("ViewName  = %d", platLogin.size());
+
+			}
+			
 		}
 
 		{
 			char sql[1024] = {};
 			sprintf_s(sql, "update HM_User set UserState = '%s' where UserID='%s'", 
 				data.CustState.c_str(),
-				data.CustID.c_str());
+				data.CustAccunt.c_str());
 
 			if((ErrCode = st_db_exec(_dbfd, sql, desc, sizeof(desc)))!=0)
 			{
@@ -177,7 +183,7 @@ bool DatabaseSync::UpdateUserByDB(const SyncPlatformData& data, SyncPlatformData
 	{
 		sprintf_s(sql, "update HM_User set UserName= '%s' where UserID='%s'", 
 			data.CustName.c_str(),
-			data.CustID.c_str());
+			data.CustAccunt.c_str());
 	}
 
 	{

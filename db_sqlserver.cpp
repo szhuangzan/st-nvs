@@ -371,6 +371,8 @@ APIEXPORT int st_db_fetch(st_dbfd_t* dbfd, const char* item, std::vector<std::ws
 	for(int i = 0;i<dbfd->_fetch_result.size();i++)
 		result.push_back(dbfd->_fetch_result[i]);
 
+	dbfd->_fetch_result.clear();
+
 	strcpy_s(desc,  desc_len, dbfd->_err_desc);
 
 	return dbfd->_err_code;

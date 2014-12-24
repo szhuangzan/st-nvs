@@ -98,7 +98,7 @@ private:
 
 		if (!_log_file)
 		{
-			_log_file = fopen(_log_filename.c_str(), "a+");
+			_log_file = fopen(_log_filename.c_str(), "r+");
 		}
 
 
@@ -106,7 +106,7 @@ private:
 			if(fwrite(log, 1, strlen(log), _log_file) == 0)
 			{
 				fclose(_log_file);
-				_log_file = fopen(_log_filename.c_str(), "a+");
+				_log_file = fopen(_log_filename.c_str(), "r+");
 
 			}
 			
@@ -261,6 +261,7 @@ void Server()
 	if(!server.InitDB(db_info))
 	{	
 		brun = false;
+		StopServer();
 		WriteToLog("Connect DB Fail, Please Check Cfg");
 		return;
 		
