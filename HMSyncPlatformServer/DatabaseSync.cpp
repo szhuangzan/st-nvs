@@ -58,27 +58,32 @@ bool DatabaseSync::Connect()
 bool DatabaseSync::CreateUserByDB(const SyncPlatformData& data, SyncPlatformDataResult& result)
 {
 	bool		flag = true;
-	char		sql[512] = {};
-	char create_user_time[20] = {};
+	char		desc[128] = {};
+	int			ErrCode = 0;
+	char        sql[512] = {};
+
+	std::string UserState;
+	flag = GetUserState(data.CustAccunt, UserState);
+	if(!UserState.compare("0103"))
+	{
+		flag = UpdateUserStateByDB(data, result);
+	}
+	else
 	{
 		time_t cur_time = st_time();
 		struct tm cur_tm ={};
 		localtime_s(&cur_tm, &cur_time);
+		char create_user_time[20] = {};
 		sprintf_s(create_user_time, 20, "%04d-%02d-%02d",cur_tm.tm_year+1900, cur_tm.tm_mon+1, cur_tm.tm_mday);
 
 		sprintf_s(sql,512, "insert into [HM_User](UserID,AreaID,Address, UserName, CreateUserTime, SerialNumber, UserState) values('%s','%s','%s','%s','%s','%s','%s')", 
-					data.CustAccunt.c_str(),
-					"root",
-					data.LinkAddr.c_str(),
-					data.CustName.c_str(),
-					create_user_time,
-					data.SerialNumber.c_str(),
-					data.CustState.c_str());
-	}
-
-	{
-		char desc[128] = {};
-		int ErrCode = 0;
+			data.CustAccunt.c_str(),
+			"root",
+			data.LinkAddr.c_str(),
+			data.CustName.c_str(),
+			create_user_time,
+			data.SerialNumber.c_str(),
+			data.CustState.c_str());
 		if(_dbfd)
 		{
 			if((ErrCode = st_db_exec(_dbfd, sql, desc, sizeof(desc)))!=0)
@@ -90,7 +95,7 @@ bool DatabaseSync::CreateUserByDB(const SyncPlatformData& data, SyncPlatformData
 				else{
 					result.ErrCode = "2";
 				}
-				
+
 				flag  = false;
 				WriteToLog("Create User, ErrCode = %x, ErrDesc = %s", ErrCode, result.Desc.c_str())	;
 			}
@@ -111,57 +116,21 @@ bool DatabaseSync::UpdateUserStateByDB(const SyncPlatformData& data, SyncPlatfor
 
 	char desc[128] = {};
 	int ErrCode = 0;
+
+	GetPlatName(data.CustName, result.ViewName);
+
 	do 
 	{
+		char sql[1024] = {};
+		sprintf_s(sql, "update HM_User set UserState = '%s' where UserID='%s'", 
+			data.CustState.c_str(),
+			data.CustAccunt.c_str());
 
+		if((ErrCode = st_db_exec(_dbfd, sql, desc, sizeof(desc)))!=0)
 		{
-			char sql[1024] = {};
-			sprintf_s(sql, "select PlatLoginName from HM_User  where UserID='%s'", 
-				data.CustAccunt.c_str());
-			ErrCode = st_db_query(_dbfd, sql, desc, sizeof(desc));
-			if(ErrCode)
-			{
-				WriteToLog("Update User, ErrCode = %x, ErrDesc = %s", ErrCode, result.Desc.c_str())	;
-				result.ErrCode = "3";
-				break;
-			}
-
-			std::vector<std::wstring> platLogin;
-			ErrCode = st_db_fetch(_dbfd, "PlatLoginName", platLogin, desc, sizeof(desc));
-			if(ErrCode)
-			{
-				result.ErrCode = "3";
-				break;
-			}
-			if(platLogin.size()==1)
-			{
-				const std::wstring& wstr = platLogin[0];
-				std::string str(wstr.length(), ' ');
-				std::copy(wstr.begin(), wstr.end(), str.begin());
-				result.ViewName = str;
-				WriteToLog("ViewName  = %s", result.ViewName.c_str());
-			}
-			else
-			{
-				WriteToLog("ViewName  = %d", platLogin.size());
-
-			}
-			
-		}
-
-		{
-			char sql[1024] = {};
-			sprintf_s(sql, "update HM_User set UserState = '%s' where UserID='%s'", 
-				data.CustState.c_str(),
-				data.CustAccunt.c_str());
-
-			if((ErrCode = st_db_exec(_dbfd, sql, desc, sizeof(desc)))!=0)
-			{
-				WriteToLog("Update User State, ErrCode = %x, ErrDesc = %s", ErrCode, result.Desc.c_str())	;
-				result.ErrCode = "3";
-				break;
-			}
-		
+			WriteToLog("Update User State, ErrCode = %x, ErrDesc = %s", ErrCode, result.Desc.c_str())	;
+			result.ErrCode = "3";
+			break;
 		}
 
 	} while (0);
@@ -169,7 +138,7 @@ bool DatabaseSync::UpdateUserStateByDB(const SyncPlatformData& data, SyncPlatfor
 	if(ErrCode)
 	{
 		result.Desc = desc;
-	//	WriteToLog("UpdateUserStateByDB, ErrCode = %d, ErrDesc = %s", result.ErrCode, result.Desc.c_str())	;
+		//	WriteToLog("UpdateUserStateByDB, ErrCode = %d, ErrDesc = %s", result.ErrCode, result.Desc.c_str())	;
 	}
 	return !ErrCode;
 }
@@ -206,5 +175,75 @@ bool DatabaseSync::DisConnect()
 	bool flag = true;
 	st_db_close(_dbfd);
 	_dbfd = 0;
+	return flag;
+}
+
+bool DatabaseSync::GetPlatName(const std::string& userID, std::string& platName)
+{
+	bool flag = true;
+	char desc[128] = {};
+	int	 ErrCode = 0;
+	char sql[1024] = {};
+	do 
+	{
+		sprintf_s(sql, "select PlatLoginName from HM_User  where UserID='%s'", userID.c_str());
+		ErrCode = st_db_query(_dbfd, sql, desc, sizeof(desc));
+		if(ErrCode)
+		{
+			flag = false;
+			break;
+		}
+
+		std::vector<std::wstring> platLogin;
+		ErrCode = st_db_fetch(_dbfd, "PlatLoginName", platLogin, desc, sizeof(desc));
+		if(ErrCode)
+		{
+			flag = false;
+			break;
+		}
+		if(platLogin.size()==1)
+		{
+			const std::wstring& wstr = platLogin[0];
+			std::string str(wstr.length(), ' ');
+			std::copy(wstr.begin(), wstr.end(), str.begin());
+			platName = str;
+		}
+	}while(0);
+
+	return flag;
+}
+
+bool DatabaseSync::GetUserState(const std::string& userID, std::string& userState)
+{
+	bool flag = true;
+	char desc[128] = {};
+	int	 ErrCode = 0;
+	char sql[1024] = {};
+	do 
+	{
+		sprintf_s(sql, "select UserState from HM_User  where UserID='%s'", userID.c_str());
+		ErrCode = st_db_query(_dbfd, sql, desc, sizeof(desc));
+		if(ErrCode)
+		{
+			flag = false;
+			break;
+		}
+
+		std::vector<std::wstring> platLogin;
+		ErrCode = st_db_fetch(_dbfd, "UserState", platLogin, desc, sizeof(desc));
+		if(ErrCode)
+		{
+			flag = false;
+			break;
+		}
+		if(platLogin.size()==1)
+		{
+			const std::wstring& wstr = platLogin[0];
+			std::string str(wstr.length(), ' ');
+			std::copy(wstr.begin(), wstr.end(), str.begin());
+			userState = str;
+		}
+	}while(0);
+
 	return flag;
 }

@@ -11,7 +11,7 @@
 #include "SyncServer.h"
 #include "ParseCfg.h"
 
-#define HM_SYNC_DEBUG 0
+#define HM_SYNC_DEBUG 1
 
 #pragma comment(lib, "st.lib")
 #pragma comment(lib, "WS2_32.lib")
@@ -464,8 +464,10 @@ void TestMain()
 {
 	st_init();
 	st_thread_create(handle_connect,0,0,0);
-	st_sleep(1000000000000);
-
+	while(1)
+	{
+		st_sleep(1000);
+	}
 }
 
 void main()

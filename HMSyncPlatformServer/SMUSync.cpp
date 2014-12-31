@@ -21,6 +21,7 @@ bool SMUSync::ParseWebService(st_netfd_t fd, std::vector<SyncPlatformData>& data
 {
 	std::string body;
 	ReadInfo(fd, body);
+	
 	if(body.empty())
 	{
 		return false;
@@ -29,6 +30,7 @@ bool SMUSync::ParseWebService(st_netfd_t fd, std::vector<SyncPlatformData>& data
 	{
 		DMXml xml;
 		xml.Decode(body.c_str());
+		
 		xml.GetRoot();
 		if(!xml.CheckNodeValid())
 		{
@@ -183,7 +185,8 @@ int SMUSync::ReadInfo(st_netfd_t fd, std::string& body)
 	{
 		return 0;
 	}
-
+	
+	
 
 	if(WebInfo.find("POST") == std::string::npos)
 	{
@@ -201,7 +204,6 @@ int SMUSync::ReadInfo(st_netfd_t fd, std::string& body)
 		free(buf);
 	}
 	body = WebInfo.substr(body_pos+sizeof("\r\n\r\n")-1);
-	WriteToLog((char*)body.c_str());
 	return read_len;
 }
 
@@ -279,7 +281,6 @@ bool SMUSync::ParseData(DMXml& xml, SyncPlatformData& data)
 				wchar_t* unciode = Utf8ToUnicode(tmp);
 				char* ascii = UnicodeToAscii((char*)unciode);
 				data.CustName = ascii;
-				WriteToLog("%s\n", ascii);
 				free(ascii);
 				free(unciode);
 				free(tmp);
@@ -301,7 +302,6 @@ bool SMUSync::ParseData(DMXml& xml, SyncPlatformData& data)
 				char* ascii = UnicodeToAscii((char*)unciode);
 			
 				data.LinkAddr = ascii;
-				WriteToLog("%s\n", ascii);
 				free(ascii);
 				free(unciode);
 				free(tmp);

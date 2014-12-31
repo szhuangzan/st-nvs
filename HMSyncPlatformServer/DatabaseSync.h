@@ -36,6 +36,8 @@ public:
 	bool DisConnect();
 private:
 	bool CheckState();
+	bool GetPlatName(const std::string& userID, std::string& platName);
+	bool GetUserState(const std::string& userID, std::string& platName);
 private:
 	char	          _connect_str[2014];
 	st_dbfd_t		  _dbfd;

@@ -108,6 +108,7 @@ void* SyncServer::HandleSessionTask(void* arg)
 			break;
 		}
 
+		
 		for(unsigned i=0;i<data_vec.size();i++)
 		{
 			SyncPlatformDataResult  result;
@@ -142,6 +143,8 @@ void* SyncServer::HandleSessionTask(void* arg)
 			}
 			result.UserState = data_vec[i].CustState;
 			result_vec.push_back(result);
+			
+			WriteToLog("Oper = %s, ErrCode = %s, ErrDesc = %s", result.UserState.c_str(), result.ErrCode.c_str(), result.Desc.c_str());
 		}
 
 	} while (0);
