@@ -300,7 +300,7 @@ typedef struct _wrap_db_oper_t
 	st_thread_t*	thread;
 
 	INT32			event;
-	char buf		[512];
+	char buf		[1024];
 	std::wstring	sql;
 
 }wrap_db_oper_t;
